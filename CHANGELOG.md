@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 — 2026-09-05
+- Graft the **@scope-creep/ext-chatbot** shell (work-013, pinned `#v0.1.0`) on a new
+  **Chat** tab — a Shadow-DOM chat panel themed by host tokens. `onSend` is a stub;
+  the agent backend arrives in work-014.
+
+
 ## 0.7.0 — 2026-09-04
 - **Work Requests** v1 (prd-work-intake §2 / the request-intake loop): a Requests
   section on the Work tab — submit a request, and each becomes a conversation thread

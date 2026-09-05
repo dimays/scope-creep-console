@@ -435,6 +435,13 @@ a.console__item-name:hover {
   color: #d9822b;
 }
 
+/* graft point for the chatbot extension shell */
+.chat-slot {
+  display: block;
+  height: 480px;
+  max-width: 640px;
+}
+
 /* graft point for the feedback extension */
 .feedback-slot {
   position: fixed;
