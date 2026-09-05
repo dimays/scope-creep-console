@@ -1,9 +1,10 @@
 import { execFile } from "node:child_process";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, feedback, requestMessages } from "~/db/schema";
-import { type HumanInputEvent, type Interlude, type SpineItem, truncate } from "./human-input";
+import { type HumanInputEvent, type SpineItem, truncate } from "./human-input";
 
 export type {
   HumanInputEvent,
@@ -22,13 +23,14 @@ export type {
 
 export async function listHumanInput(): Promise<HumanInputEvent[]> {
   await ensureSchema();
-  const [chats, reqMsgs, fbs] = await Promise.all([
+  const [chats, reqMsgs, fbs, operatorEvents] = await Promise.all([
     db.select().from(conversationMessages),
     db.select().from(requestMessages),
     db.select().from(feedback),
+    readOperatorSessions(),
   ]);
 
-  const events: HumanInputEvent[] = [];
+  const events: HumanInputEvent[] = [...operatorEvents];
 
   for (const m of chats) {
     if (m.role !== "owner") continue;
@@ -85,6 +87,62 @@ const exec = promisify(execFile);
 
 function controlPlaneHome(): string {
   return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
+}
+
+type OperatorRecord = {
+  source?: string;
+  ts?: number;
+  session?: string;
+  cwd?: string;
+  text?: string;
+};
+
+/**
+ * The terminal input surface (work-020, ADR-010): the UserPromptSubmit hook appends
+ * one NDJSON line per Owner prompt to the control-plane's LOCAL, gitignored
+ * human-input/YYYY-MM.ndjson. We read it here so first-class Claude-session inputs
+ * join the timeline instead of showing as a "capture pending" gap. Best-effort: a
+ * missing dir (hook not installed) or a malformed line is skipped, never thrown.
+ */
+async function readOperatorSessions(): Promise<HumanInputEvent[]> {
+  const dir = join(controlPlaneHome(), "human-input");
+  let files: string[];
+  try {
+    files = (await readdir(dir)).filter((f) => f.endsWith(".ndjson"));
+  } catch {
+    return [];
+  }
+  const events: HumanInputEvent[] = [];
+  for (const file of files) {
+    let raw: string;
+    try {
+      raw = await readFile(join(dir, file), "utf8");
+    } catch {
+      continue;
+    }
+    const lines = raw.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      let rec: OperatorRecord;
+      try {
+        rec = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const text = rec.text?.trim();
+      if (!text || typeof rec.ts !== "number") continue;
+      events.push({
+        id: `op:${file}:${i}`,
+        ts: rec.ts,
+        source: "operator-session",
+        intent: "directive",
+        summary: truncate(text),
+        excerpt: text,
+      });
+    }
+  }
+  return events;
 }
 
 /** Control-plane commit subjects in (fromTs, toTs] — the derived "work between inputs". */
