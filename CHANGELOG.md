@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-09-04
+- **Work** board (per ADR-005): reads the control plane's `work/*.md` records and
+  renders a read-only kanban grouped by status (Proposed / Active / Blocked / Done),
+  with priority accents, type tags, and per-item detail pages. Global nav entry.
+
 ## 0.2.0 — 2026-09-04
 - **Explore** (per the CPO's PRD): understand the platform from inside the Console.
   - Docs browser with `[[wikilink]]` resolution; per-doc rendered markdown.

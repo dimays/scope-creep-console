@@ -346,3 +346,115 @@ a.console__item-name:hover {
   border-left: 3px solid var(--sc-accent);
   color: var(--sc-muted);
 }
+
+/* work board */
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(200px, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+}
+
+@media (max-width: 720px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
+}
+
+.board__col {
+  background: color-mix(in srgb, var(--sc-surface) 55%, transparent);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  padding: 0.85rem;
+  min-width: 0;
+}
+
+.board__col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.board__col-title {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sc-muted);
+}
+
+.board__empty {
+  margin: 0;
+  color: var(--sc-border);
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-left: 3px solid var(--sc-border);
+  border-radius: 9px;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.6rem;
+  transition: border-color 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--sc-accent);
+}
+
+.card--high {
+  border-left-color: #d9822b;
+}
+
+.card--medium {
+  border-left-color: var(--sc-accent);
+}
+
+.card--low {
+  border-left-color: var(--sc-border);
+}
+
+.card__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.card__owner {
+  color: var(--sc-muted);
+  font-size: 0.72rem;
+}
+
+.tag {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
+  background: var(--sc-tag-bg);
+  color: var(--sc-accent);
+}
+
+.tag--bug {
+  background: color-mix(in srgb, #d92b2b 16%, transparent);
+  color: #e06666;
+}
+
+.tag--debt {
+  background: color-mix(in srgb, #d9822b 16%, transparent);
+  color: #d9822b;
+}

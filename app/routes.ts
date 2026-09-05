@@ -9,4 +9,6 @@ export default [
   route("explore/agents/:name", "routes/explore-agent.tsx"),
   route("explore/timeline", "routes/explore-timeline.tsx"),
   route("explore/consistency", "routes/explore-consistency.tsx"),
+  route("work", "routes/work.tsx"),
+  route("work/:id", "routes/work-item.tsx"),
 ] satisfies RouteConfig;
