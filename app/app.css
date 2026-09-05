@@ -501,3 +501,101 @@ a.console__item-name:hover {
   font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
 }
+
+/* work requests */
+.req-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 2rem;
+}
+
+.req-input,
+.req-textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.req-textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.req-submit {
+  font: inherit;
+  cursor: pointer;
+  background: var(--sc-accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.msg {
+  border: 1px solid var(--sc-border);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  max-width: 80%;
+}
+
+.msg--owner {
+  align-self: flex-end;
+  background: var(--sc-tag-bg);
+}
+
+.msg--agent {
+  align-self: flex-start;
+  background: var(--sc-surface);
+}
+
+.msg__author {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sc-muted);
+  margin-bottom: 0.25rem;
+}
+
+.msg__body {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.req-status--open {
+  background: var(--sc-tag-bg);
+  color: var(--sc-accent);
+}
+
+.req-status--accepted {
+  background: color-mix(in srgb, #3aa76d 20%, transparent);
+  color: #3aa76d;
+}
+
+.req-status--declined {
+  background: color-mix(in srgb, var(--sc-danger) 16%, transparent);
+  color: var(--sc-danger);
+}
+
+.req-status--needs-info {
+  background: color-mix(in srgb, var(--sc-warn) 16%, transparent);
+  color: var(--sc-warn);
+}
+
+.req-status--done {
+  background: var(--sc-tag-bg);
+  color: var(--sc-muted);
+}

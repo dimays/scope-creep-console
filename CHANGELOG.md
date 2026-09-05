@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 — 2026-09-04
+- **Work Requests** v1 (prd-work-intake §2 / the request-intake loop): a Requests
+  section on the Work tab — submit a request, and each becomes a conversation thread
+  with a status. `requests` + `request_messages` tables; triage responses are written
+  back to the thread (async, operator-side in v1).
+
 ## 0.6.0 — 2026-09-04
 - **Work History** (per prd-work-intake §1): a Board/History sub-nav on the Work tab;
   History lists shipped work newest-first with links to each ticket and its GitHub PR.

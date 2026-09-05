@@ -40,6 +40,24 @@ export function ensureSchema(): Promise<void> {
          at INTEGER NOT NULL
        )`,
     );
+    await client.execute(
+      `CREATE TABLE IF NOT EXISTS requests (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         title TEXT NOT NULL,
+         status TEXT NOT NULL DEFAULT 'open',
+         created_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL
+       )`,
+    );
+    await client.execute(
+      `CREATE TABLE IF NOT EXISTS request_messages (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         request_id INTEGER NOT NULL,
+         author TEXT NOT NULL,
+         body TEXT NOT NULL,
+         at INTEGER NOT NULL
+       )`,
+    );
   })();
   return ready;
 }

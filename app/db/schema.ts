@@ -23,3 +23,23 @@ export const feedback = sqliteTable("feedback", {
 });
 
 export type Feedback = typeof feedback.$inferSelect;
+
+/** Work Requests: an intake thread (title + status) with a message conversation. */
+export const requests = sqliteTable("requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("open"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const requestMessages = sqliteTable("request_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  requestId: integer("request_id").notNull(),
+  author: text("author").notNull(),
+  body: text("body").notNull(),
+  at: integer("at").notNull(),
+});
+
+export type Request = typeof requests.$inferSelect;
+export type RequestMessage = typeof requestMessages.$inferSelect;

@@ -12,5 +12,7 @@ export default [
   route("explore/consistency", "routes/explore-consistency.tsx"),
   route("work", "routes/work.tsx"),
   route("work/history", "routes/work-history.tsx"),
+  route("work/requests", "routes/work-requests.tsx"),
+  route("work/requests/:id", "routes/work-request.tsx"),
   route("work/:id", "routes/work-item.tsx"),
 ] satisfies RouteConfig;
