@@ -1,5 +1,7 @@
 import { Link } from "react-router";
 import { WorkNav } from "~/components/work-nav";
+import type { HumanInputEvent, InputSource } from "~/lib/human-input";
+import { isExpandable } from "~/lib/human-input";
 import { buildSpine } from "~/lib/human-input.server";
 import type { Route } from "./+types/work-inputs";
 
@@ -20,6 +22,51 @@ export async function loader(_: Route.LoaderArgs) {
 function fmt(ts: number): string {
   // Deterministic UTC (avoids SSR/client hydration mismatch).
   return new Date(ts).toISOString().slice(0, 16).replace("T", " ");
+}
+
+const SOURCE_LABEL: Record<InputSource, string> = {
+  "console-chat": "chat",
+  "work-request": "the request",
+  "request-reply": "the request",
+  feedback: "feedback",
+  "operator-session": "the session",
+  "owner-action": "the action",
+};
+
+/** One input: expandable to the full message when the preview is truncated, and,
+ * where the input has a source page, a link out to it (matching the app's
+ * click-through-to-detail experience). */
+function InputEntry({ input }: { input: HumanInputEvent }) {
+  const full = input.excerpt?.trim();
+  const source = input.refUrl ? (
+    <p className="input-source">
+      <Link to={input.refUrl} className="input-link">
+        View in {SOURCE_LABEL[input.source]} →
+      </Link>
+    </p>
+  ) : null;
+
+  if (isExpandable(input.summary, full)) {
+    return (
+      <details className="input-disclosure">
+        <summary className="input-summary">{input.summary}</summary>
+        <div className="input-full">{full}</div>
+        {source}
+      </details>
+    );
+  }
+
+  return (
+    <p className="input-summary">
+      {input.refUrl ? (
+        <Link to={input.refUrl} className="input-link">
+          {input.summary}
+        </Link>
+      ) : (
+        input.summary
+      )}
+    </p>
+  );
 }
 
 export default function WorkInputs({ loaderData }: Route.ComponentProps) {
@@ -55,15 +102,7 @@ export default function WorkInputs({ loaderData }: Route.ComponentProps) {
                   <span className="chip chip--intent">{item.input.intent}</span>
                   <span className="input-when">{fmt(item.input.ts)}</span>
                 </div>
-                <p className="input-summary">
-                  {item.input.refUrl ? (
-                    <Link to={item.input.refUrl} className="input-link">
-                      {item.input.summary}
-                    </Link>
-                  ) : (
-                    item.input.summary
-                  )}
-                </p>
+                <InputEntry input={item.input} />
               </li>
             ) : (
               <li

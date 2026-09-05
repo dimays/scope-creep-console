@@ -667,6 +667,30 @@ a.console__item-name:hover {
   color: var(--sc-accent);
 }
 
+.input-disclosure > summary {
+  margin: 0;
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.input-disclosure > summary:hover {
+  color: var(--sc-accent);
+}
+
+.input-full {
+  margin: 0.5rem 0 0;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--sc-border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--sc-text);
+}
+
+.input-source {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+}
+
 .spine__interlude {
   padding: 0.55rem 0 0.55rem 1rem;
   margin: 0.4rem 0 0.4rem 0.5rem;
