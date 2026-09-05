@@ -84,11 +84,16 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
+    <main className="console">
+      <header className="console__header">
+        <div>
+          <p className="console__eyebrow">Something went wrong</p>
+          <h1 className="console__title">{message}</h1>
+        </div>
+      </header>
+      <p className="console__notice">{details}</p>
       {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
+        <pre className="error__stack">
           <code>{stack}</code>
         </pre>
       )}

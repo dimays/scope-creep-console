@@ -13,6 +13,26 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Keyboard-focus system: one visible accent ring for every interactive element.
+   :where() keeps specificity at 0 so component styles still win on color. */
+:where(a, button, summary, input, textarea, select, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--sc-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ErrorBoundary stack (root.tsx), on-brand instead of raw utility classes. */
+.error__stack {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  overflow-x: auto;
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  color: var(--sc-muted);
+  font-size: 0.8rem;
+}
+
 .console {
   max-width: 960px;
   margin: 0 auto;
@@ -128,8 +148,8 @@ body {
 }
 
 .console__count--warn {
-  background: color-mix(in srgb, #d9822b 18%, transparent);
-  color: #d9822b;
+  background: color-mix(in srgb, var(--sc-warn) 18%, transparent);
+  color: var(--sc-warn);
 }
 
 /* top nav */
@@ -385,7 +405,7 @@ a.console__item-name:hover {
 }
 
 .card--high {
-  border-left-color: #d9822b;
+  border-left-color: var(--sc-warn);
 }
 
 .card--medium {
@@ -426,13 +446,13 @@ a.console__item-name:hover {
 }
 
 .tag--bug {
-  background: color-mix(in srgb, #d92b2b 16%, transparent);
-  color: #e06666;
+  background: color-mix(in srgb, var(--sc-danger) 16%, transparent);
+  color: var(--sc-danger);
 }
 
 .tag--debt {
-  background: color-mix(in srgb, #d9822b 16%, transparent);
-  color: #d9822b;
+  background: color-mix(in srgb, var(--sc-warn) 16%, transparent);
+  color: var(--sc-warn);
 }
 
 /* graft point for the chatbot extension shell */

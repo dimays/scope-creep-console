@@ -18,6 +18,7 @@ const DISPLAY_NAMES: Record<string, string> = {
   "chief-designer": "Chief Designer",
   "chief-knowledge-manager": "Chief Knowledge Manager",
   "chief-product-officer": "Chief Product Officer",
+  "chief-reality-officer": "Chief Reality Officer",
 };
 
 const DOC_DIRS: Array<{ dir: string; group: string }> = [
