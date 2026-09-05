@@ -21,12 +21,19 @@ export type RegistryApp = {
   repo?: string;
 };
 
+export type RegistryExtension = {
+  name?: string;
+  kind?: string;
+  status?: string;
+  repo?: string;
+};
+
 export type Registry = {
   home: string;
   available: boolean;
   agents: RegistryAgent[];
   apps: RegistryApp[];
-  extensions: unknown[];
+  extensions: RegistryExtension[];
 };
 
 function controlPlaneHome(): string {
@@ -43,7 +50,7 @@ export async function readRegistry(): Promise<Registry> {
     const [agents, apps, extensions] = await Promise.all([
       readJson<{ agents?: RegistryAgent[] }>(join(home, "registry", "agents.json")),
       readJson<{ apps?: RegistryApp[] }>(join(home, "registry", "apps.json")),
-      readJson<{ extensions?: unknown[] }>(join(home, "registry", "extensions.json")),
+      readJson<{ extensions?: RegistryExtension[] }>(join(home, "registry", "extensions.json")),
     ]);
     return {
       home,

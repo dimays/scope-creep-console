@@ -63,7 +63,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <ul className="console__list">
               {registry.apps.map((app, i) => (
                 <li key={app.name ?? i} className="console__item">
-                  <span className="console__item-name">{app.name ?? "unnamed"}</span>
+                  <RegistryName name={app.name} repo={app.repo} />
                 </li>
               ))}
             </ul>
@@ -71,11 +71,36 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </Panel>
 
         <Panel title="Extensions" count={registry.extensions.length}>
-          <p className="console__empty">None installed yet.</p>
+          {registry.extensions.length === 0 ? (
+            <p className="console__empty">None installed yet.</p>
+          ) : (
+            <ul className="console__list">
+              {registry.extensions.map((ext, i) => (
+                <li key={ext.name ?? i} className="console__item">
+                  <RegistryName name={ext.name} repo={ext.repo} />
+                  {ext.kind && <span className="console__tag">{ext.kind}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
         </Panel>
       </section>
     </main>
   );
+}
+
+// Apps/extensions live in their own repos, so their entries link out to the repo
+// (its README is the doc). Non-URL repo values (e.g. "pending-remote") render as text.
+function RegistryName({ name, repo }: { name?: string; repo?: string }) {
+  const label = name ?? "unnamed";
+  if (repo?.startsWith("http")) {
+    return (
+      <a href={repo} target="_blank" rel="noreferrer" className="console__item-name">
+        {label} ↗
+      </a>
+    );
+  }
+  return <span className="console__item-name">{label}</span>;
 }
 
 function Panel({
