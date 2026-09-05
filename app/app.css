@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+/*
+ * v0.1 token layer. Design decisions live as runtime CSS custom properties, not
+ * compiled into components — honoring the Chief Designer's constraint #1. This
+ * seed will be superseded by the shared @scope-creep/design package.
+ */
+:root {
+  --sc-bg: #f7f7f5;
+  --sc-surface: #ffffff;
+  --sc-border: #e5e4df;
+  --sc-text: #1c1b19;
+  --sc-muted: #78756e;
+  --sc-accent: #6d5cff;
+  --sc-tag-bg: #efeefc;
+  --sc-radius: 12px;
+  --sc-font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sc-bg: #141311;
+    --sc-surface: #1e1c1a;
+    --sc-border: #322f2b;
+    --sc-text: #f3f1ec;
+    --sc-muted: #a29d94;
+    --sc-accent: #9b8cff;
+    --sc-tag-bg: #2a2740;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--sc-bg);
+  color: var(--sc-text);
+  font-family: var(--sc-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.console {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.console__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.console__eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sc-accent);
+}
+
+.console__title {
+  margin: 0.15rem 0 0;
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.console__meta {
+  margin: 0;
+  color: var(--sc-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.console__notice {
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-left: 3px solid var(--sc-accent);
+  border-radius: var(--sc-radius);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+  color: var(--sc-muted);
+}
+
+.console__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.console__panel {
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  padding: 1.25rem;
+}
+
+.console__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.console__panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.console__count {
+  min-width: 1.5rem;
+  text-align: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--sc-tag-bg);
+  color: var(--sc-accent);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.console__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.console__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.console__item-name {
+  font-weight: 500;
+}
+
+.console__tag {
+  font-size: 0.72rem;
+  color: var(--sc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.console__empty {
+  margin: 0;
+  color: var(--sc-muted);
+  font-size: 0.9rem;
+}
