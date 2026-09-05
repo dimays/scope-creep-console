@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — 2026-09-05
+- **In-app agent runtime** (work-014, ADR-008): the Chat tab is now backed by
+  persisted conversations (`conversations` + `conversation_messages`) and an
+  agent-turn endpoint that calls Claude server-side when `ANTHROPIC_API_KEY` is set,
+  with a clear fallback otherwise. Text-only; code-editing arrives in work-015/016.
+
+
 ## 0.8.0 — 2026-09-05
 - Graft the **@scope-creep/ext-chatbot** shell (work-013, pinned `#v0.1.0`) on a new
   **Chat** tab — a Shadow-DOM chat panel themed by host tokens. `onSend` is a stub;
