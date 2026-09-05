@@ -12,3 +12,14 @@ export const pageVisits = sqliteTable("page_visits", {
 });
 
 export type PageVisit = typeof pageVisits.$inferSelect;
+
+/** Feedback recorded by the @scope-creep/ext-feedback extension. */
+export const feedback = sqliteTable("feedback", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  contextKey: text("context_key").notNull(),
+  rating: text("rating").notNull(),
+  comment: text("comment").notNull().default(""),
+  at: integer("at").notNull(),
+});
+
+export type Feedback = typeof feedback.$inferSelect;

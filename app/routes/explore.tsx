@@ -1,5 +1,8 @@
 import { Link } from "react-router";
 import { ExploreNav } from "~/components/explore-nav";
+import { FeedbackMount } from "~/components/feedback-mount";
+import { db, ensureSchema } from "~/db";
+import { feedback } from "~/db/schema";
 import { consistency, listDocs, listLedger } from "~/lib/explore.server";
 import { readRegistry } from "~/lib/registry.server";
 import type { Route } from "./+types/explore";
@@ -9,11 +12,13 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader(_: Route.LoaderArgs) {
-  const [docs, ledger, registry, report] = await Promise.all([
+  await ensureSchema();
+  const [docs, ledger, registry, report, feedbackRows] = await Promise.all([
     listDocs(),
     listLedger(),
     readRegistry(),
     consistency(),
+    db.select().from(feedback),
   ]);
   return {
     counts: { docs: docs.length, agents: registry.agents.length, ledger: ledger.length },
@@ -22,11 +27,12 @@ export async function loader(_: Route.LoaderArgs) {
       report.proposedDocs.length +
       report.ungeneratedRegistries.length +
       report.staleDocs.length,
+    feedbackCount: feedbackRows.length,
   };
 }
 
 export default function Explore({ loaderData }: Route.ComponentProps) {
-  const { counts, issues } = loaderData;
+  const { counts, issues, feedbackCount } = loaderData;
   return (
     <main className="console">
       <header className="console__header">
@@ -52,7 +58,12 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
       </section>
       <p className="console__meta" style={{ marginTop: "1.25rem" }}>
         Agents live on the <Link to="/">dashboard</Link> — open one for its profile.
+        {feedbackCount > 0 ? ` · ${feedbackCount} feedback recorded` : ""}
       </p>
+      <FeedbackMount
+        contextKey="console/explore/overview"
+        question="Is Explore helping you understand the platform?"
+      />
     </main>
   );
 }

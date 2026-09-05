@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — 2026-09-04
+- Graft the **@scope-creep/ext-feedback** extension (pinned `#v0.1.0` via git) onto
+  Explore — a non-nagging Shadow-DOM feedback prompt, themed by the host tokens.
+- Add a `feedback` table + `/feedback` action route (host-side persistence); show a
+  feedback count on Explore.
+
 ## 0.4.0 — 2026-09-04
 - Consume the shared **@scope-creep/design** token layer (pinned `#v0.1.0` via git);
   removed the inline `--sc-*` token copy. Tokens are now centralized and versioned.

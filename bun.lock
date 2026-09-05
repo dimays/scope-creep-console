@@ -9,6 +9,7 @@
         "@react-router/node": "^8",
         "@react-router/serve": "^8",
         "@scope-creep/design": "github:dimays/scope-creep-design#v0.1.0",
+        "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0",
         "drizzle-orm": "^0.36.4",
         "isbot": "^5.1.36",
         "marked": "^18.0.11",
@@ -273,6 +274,8 @@
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.63.1", "", { "os": "win32", "cpu": "x64" }, "sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w=="],
 
     "@scope-creep/design": ["@scope-creep/design@github:dimays/scope-creep-design#14ab258", { "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "dimays-scope-creep-design-14ab258", "sha512-LoC6+SqiK3nAiUebZR8HPlQL4GsvVqAcoyfy3YqHG/wDwWU92vbcYuUS64uV4/XaU/EhwBxtB6SG4vV8i5/EPw=="],
+
+    "@scope-creep/ext-feedback": ["@scope-creep/ext-feedback@github:dimays/scope-creep-ext-feedback#8bed623", {}, "dimays-scope-creep-ext-feedback-8bed623", "sha512-1tFEbJJl1UXnXyYBCriIV3gZ2ON8qMbnCOcd/nwcLmxWtQb1K2xv8mBiWBSbKigPp3E7I0iGGYQVcy9Eh87+dg=="],
 
     "@tailwindcss/node": ["@tailwindcss/node@4.3.3", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "enhanced-resolve": "^5.24.1", "jiti": "^2.7.0", "lightningcss": "1.32.0", "magic-string": "^0.30.21", "source-map-js": "^1.2.1", "tailwindcss": "4.3.3" } }, "sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg=="],
 
