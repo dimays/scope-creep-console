@@ -9,6 +9,7 @@
         "@react-router/node": "^8",
         "@react-router/serve": "^8",
         "@scope-creep/design": "github:dimays/scope-creep-design#v0.1.0",
+        "@scope-creep/ext-chatbot": "github:dimays/scope-creep-ext-chatbot#v0.1.0",
         "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0",
         "drizzle-orm": "^0.36.4",
         "isbot": "^5.1.36",
@@ -274,6 +275,8 @@
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.63.1", "", { "os": "win32", "cpu": "x64" }, "sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w=="],
 
     "@scope-creep/design": ["@scope-creep/design@github:dimays/scope-creep-design#14ab258", { "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "dimays-scope-creep-design-14ab258", "sha512-LoC6+SqiK3nAiUebZR8HPlQL4GsvVqAcoyfy3YqHG/wDwWU92vbcYuUS64uV4/XaU/EhwBxtB6SG4vV8i5/EPw=="],
+
+    "@scope-creep/ext-chatbot": ["@scope-creep/ext-chatbot@github:dimays/scope-creep-ext-chatbot#3ea32cd", {}, "dimays-scope-creep-ext-chatbot-3ea32cd", "sha512-67w/3fY6jsVU9vWSO4UG54Dk4xXK7yZUE85/jZLoES+DzXKu7tm3vHPrlc/KVd6ofFyNz71jIggiX1F3l9+cYw=="],
 
     "@scope-creep/ext-feedback": ["@scope-creep/ext-feedback@github:dimays/scope-creep-ext-feedback#8bed623", {}, "dimays-scope-creep-ext-feedback-8bed623", "sha512-1tFEbJJl1UXnXyYBCriIV3gZ2ON8qMbnCOcd/nwcLmxWtQb1K2xv8mBiWBSbKigPp3E7I0iGGYQVcy9Eh87+dg=="],
 
