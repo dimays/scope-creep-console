@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    name: App Contract test gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      # The App Contract `test` target: typegen + tsc + biome + vitest, under Bun.
+      - name: Gate (Bun)
+        run: bun run test
+
+      # Golden Path amendment #3: the test gate also runs under the production
+      # runtime (Node LTS), so we never ship a Bun-only green.
+      - name: Vitest under Node LTS (parity)
+        run: node_modules/.bin/vitest run
+
+      - name: Production build
+        run: bun run build
