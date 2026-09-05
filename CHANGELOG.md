@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0 — 2026-09-05
+- **Preview sandbox** (work-015, ADR-009): apply a proposed edit in an isolated git
+  worktree and return the diff, with proof the running app is untouched
+  (`/chat/preview`). Path-safety gate on proposals. Isolation engine only; the
+  interactive live-serve preview + agent-generated proposals are work-017.
+
+
 ## 0.9.0 — 2026-09-05
 - **In-app agent runtime** (work-014, ADR-008): the Chat tab is now backed by
   persisted conversations (`conversations` + `conversation_messages`) and an
