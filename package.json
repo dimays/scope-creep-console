@@ -23,8 +23,8 @@
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
-    "@react-router/node": "^8",
-    "@react-router/serve": "^8",
+    "@react-router/node": "8.3.1",
+    "@react-router/serve": "8.3.1",
     "@scope-creep/design": "github:dimays/scope-creep-design#v0.1.0",
     "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0",
     "@scope-creep/ext-chatbot": "github:dimays/scope-creep-ext-chatbot#v0.1.0",
@@ -33,11 +33,11 @@
     "marked": "^18.0.11",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router": "^8"
+    "react-router": "8.3.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
-    "@react-router/dev": "^8",
+    "@react-router/dev": "8.3.1",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^22",
     "@types/react": "^19.2.14",
@@ -45,7 +45,7 @@
     "drizzle-kit": "^0.28.1",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "vite": "^8.0.3",
+    "vite": "8.2.2",
     "vitest": "^3.0.0"
   }
 }
