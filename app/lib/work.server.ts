@@ -22,6 +22,7 @@ export type WorkItem = {
   priority: string;
   owner: string;
   spec?: string;
+  pr?: string;
   created: string;
   updated: string;
   file: string;
@@ -52,6 +53,7 @@ function toItem(fm: Record<string, string>, file: string): WorkItem {
     priority: fm.priority ?? "low",
     owner: fm.owner ?? "",
     spec: fm.spec || undefined,
+    pr: fm.pr || undefined,
     created: fm.created ?? "",
     updated: fm.updated ?? "",
     file,
@@ -83,6 +85,19 @@ export async function board(): Promise<WorkColumn[]> {
     label: status.charAt(0).toUpperCase() + status.slice(1),
     items: items.filter((item) => item.status === status),
   }));
+}
+
+function numericId(id: string): number {
+  const match = /(\d+)/.exec(id);
+  return match ? Number.parseInt(match[1], 10) : 0;
+}
+
+/** Shipped work, newest-first — the condensed history/changelog. */
+export async function doneHistory(): Promise<WorkItem[]> {
+  const items = await listWork();
+  return items
+    .filter((item) => item.status === "done")
+    .sort((a, b) => numericId(b.id) - numericId(a.id));
 }
 
 export async function readWorkItem(id: string): Promise<{ item: WorkItem; html: string } | null> {

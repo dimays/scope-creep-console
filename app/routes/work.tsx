@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { WorkNav } from "~/components/work-nav";
 import { board } from "~/lib/work.server";
 import type { Route } from "./+types/work";
 
@@ -22,6 +23,7 @@ export default function Work({ loaderData }: Route.ComponentProps) {
         </div>
         <p className="console__meta">{total} items · from the control plane</p>
       </header>
+      <WorkNav />
       <div className="board">
         {columns.map((col) => (
           <section key={col.status} className="board__col">

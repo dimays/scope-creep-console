@@ -442,3 +442,62 @@ a.console__item-name:hover {
   bottom: 1.25rem;
   z-index: 50;
 }
+
+/* work history */
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.history__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--sc-border);
+}
+
+.history__item:last-child {
+  border-bottom: 0;
+}
+
+.history__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.history__title {
+  color: var(--sc-text);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.history__title:hover {
+  color: var(--sc-accent);
+}
+
+.history__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.history__owner {
+  color: var(--sc-muted);
+  font-size: 0.78rem;
+}
+
+.history__pr {
+  color: var(--sc-accent);
+  text-decoration: none;
+  font-size: 0.78rem;
+}
+
+.history__id {
+  color: var(--sc-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+}
