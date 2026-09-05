@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.0 — 2026-09-05
+- **Human-Input Log v1a** (work-012, ADR-010): a Work → Inputs timeline — a projection
+  (owns no data) over the three already-captured Owner-input sources (chat, requests,
+  feedback), tagged by Source + Intent, interleaved with git-derived "work between
+  inputs" interludes + a leverage readout. Terminal/gate capture is work-020.
+
+
 ## 0.12.0 — 2026-09-05
 - **Dashboard fix** (work-019, from request #2): the Extensions panel now lists
   registered extensions (was hardcoded to "None installed yet" despite the count).

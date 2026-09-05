@@ -19,5 +19,6 @@ export default [
   route("work/history", "routes/work-history.tsx"),
   route("work/requests", "routes/work-requests.tsx"),
   route("work/requests/:id", "routes/work-request.tsx"),
+  route("work/inputs", "routes/work-inputs.tsx"),
   route("work/:id", "routes/work-item.tsx"),
 ] satisfies RouteConfig;
