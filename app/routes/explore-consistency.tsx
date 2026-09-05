@@ -28,6 +28,15 @@ export default function Consistency({ loaderData }: Route.ComponentProps) {
       {report.ok && <p className="console__notice">Everything checks out — nothing out of sync.</p>}
 
       <Section
+        title="Version skew (version.ts ↔ package.json ↔ CHANGELOG)"
+        hint="These must agree — /healthz reads version.ts, so a lag makes it report a stale version."
+        empty="Release version is in sync."
+        items={report.versionSkew.map((v) => ({
+          key: v.source,
+          label: `${v.source}: ${v.version}`,
+        }))}
+      />
+      <Section
         title="Registries not yet generated"
         hint="Still hand-seeded. Building the harvester will generate these from manifests."
         empty="All registries are generated."

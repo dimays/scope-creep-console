@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { marked } from "marked";
+import { APP_VERSION } from "./version";
 
 /**
  * Reads the Scope Creep control plane (docs, agents, ledger, registries) so the
@@ -237,8 +238,29 @@ export type ConsistencyReport = {
   proposedDocs: Array<{ slug: string; title: string }>;
   ungeneratedRegistries: string[];
   staleDocs: Array<{ slug: string; lastVerified: string; days: number }>;
+  versionSkew: Array<{ source: string; version: string }>;
   ok: boolean;
 };
+
+/**
+ * The app's release version lives in three places that must agree (version.ts,
+ * package.json, CHANGELOG top entry) — /healthz reads the first, so a lag makes it
+ * lie. Returns each source's version when they disagree, or [] when aligned. Pure +
+ * unit-tested. (MANIFEST.yaml's version is a separate app-manifest axis, not checked.)
+ */
+export function versionSkew(v: {
+  app: string;
+  pkg: string | null;
+  changelog: string | null;
+}): Array<{ source: string; version: string }> {
+  const entries = [
+    { source: "version.ts", version: v.app },
+    { source: "package.json", version: v.pkg },
+    { source: "CHANGELOG.md", version: v.changelog },
+  ].filter((e): e is { source: string; version: string } => e.version !== null);
+  const distinct = new Set(entries.map((e) => e.version));
+  return distinct.size > 1 ? entries : [];
+}
 
 export async function consistency(): Promise<ConsistencyReport> {
   const docs = await listDocs();
@@ -273,11 +295,36 @@ export async function consistency(): Promise<ConsistencyReport> {
     if (src && /"_generated"\s*:\s*false/.test(src)) ungeneratedRegistries.push(file);
   }
 
+  // The app's own release version lives here (this app's cwd), not the control plane.
+  let pkgVersion: string | null = null;
+  let changelogVersion: string | null = null;
+  try {
+    pkgVersion =
+      JSON.parse(await readFile(join(process.cwd(), "package.json"), "utf8")).version ?? null;
+  } catch {}
+  try {
+    const changelog = await readFile(join(process.cwd(), "CHANGELOG.md"), "utf8");
+    changelogVersion = changelog.match(/##\s+(\d+\.\d+\.\d+)/)?.[1] ?? null;
+  } catch {}
+  const versionSkew_ = versionSkew({
+    app: APP_VERSION,
+    pkg: pkgVersion,
+    changelog: changelogVersion,
+  });
+
   const ok =
     danglingLinks.length === 0 &&
     proposedDocs.length === 0 &&
     ungeneratedRegistries.length === 0 &&
-    staleDocs.length === 0;
+    staleDocs.length === 0 &&
+    versionSkew_.length === 0;
 
-  return { danglingLinks, proposedDocs, ungeneratedRegistries, staleDocs, ok };
+  return {
+    danglingLinks,
+    proposedDocs,
+    ungeneratedRegistries,
+    staleDocs,
+    versionSkew: versionSkew_,
+    ok,
+  };
 }

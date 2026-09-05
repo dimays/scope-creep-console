@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.0 — 2026-09-05
+- **Human-Input Log — expand to full message** (work-021, PR #14): a truncated entry is
+  now a native `<details>` disclosure; clicking reveals the full message inline
+  (pre-wrapped). Entries with a source page link out to it from the expanded view.
+
+## 0.14.0 — 2026-09-05
+- **Human-Input Log — terminal capture reader** (work-020, PR #13): `listHumanInput()`
+  unions the control-plane's local `human-input/*.ndjson` (via `SCOPE_CREEP_HOME`),
+  surfacing `operator-session` (terminal) inputs in the Work → Inputs timeline.
+
 ## 0.13.0 — 2026-09-05
 - **Human-Input Log v1a** (work-012, ADR-010): a Work → Inputs timeline — a projection
   (owns no data) over the three already-captured Owner-input sources (chat, requests,
