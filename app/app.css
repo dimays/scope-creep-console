@@ -1,33 +1,9 @@
 @import "tailwindcss";
 
 /*
- * v0.1 token layer. Design decisions live as runtime CSS custom properties, not
- * compiled into components — honoring the Chief Designer's constraint #1. This
- * seed will be superseded by the shared @scope-creep/design package.
+ * Design tokens (the --sc-* layer, light + dark) now come from the shared
+ * @scope-creep/design package, imported in app/root.tsx. No per-app token copy.
  */
-:root {
-  --sc-bg: #f7f7f5;
-  --sc-surface: #ffffff;
-  --sc-border: #e5e4df;
-  --sc-text: #1c1b19;
-  --sc-muted: #78756e;
-  --sc-accent: #6d5cff;
-  --sc-tag-bg: #efeefc;
-  --sc-radius: 12px;
-  --sc-font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --sc-bg: #141311;
-    --sc-surface: #1e1c1a;
-    --sc-border: #322f2b;
-    --sc-text: #f3f1ec;
-    --sc-muted: #a29d94;
-    --sc-accent: #9b8cff;
-    --sc-tag-bg: #2a2740;
-  }
-}
 
 body {
   margin: 0;

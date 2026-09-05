@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 — 2026-09-04
+- Consume the shared **@scope-creep/design** token layer (pinned `#v0.1.0` via git);
+  removed the inline `--sc-*` token copy. Tokens are now centralized and versioned.
+
 ## 0.3.0 — 2026-09-04
 - **Work** board (per ADR-005): reads the control plane's `work/*.md` records and
   renders a read-only kanban grouped by status (Proposed / Active / Blocked / Done),
