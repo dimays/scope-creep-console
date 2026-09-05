@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 — 2026-09-05
+- **Approve → gated PR** (work-016, ADR-009): approving a proposal builds its edits on
+  an isolated branch (worktree), pushes it, and opens a gated PR (`/chat/land`) — never
+  auto-merged; the merge stays the Owner's gated action. Declining closes the PR and
+  deletes the branch (`/chat/decline`). Closes the ADR-009 loop.
+
+
 ## 0.10.0 — 2026-09-05
 - **Preview sandbox** (work-015, ADR-009): apply a proposed edit in an isolated git
   worktree and return the diff, with proof the running app is untouched
