@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Edit, validateProposal } from "./sandbox.server";
+import { type Edit, proposalBranch, validateProposal } from "./sandbox.server";
 
 const ok = (edits: Edit[]) => validateProposal(edits).ok;
 
@@ -25,5 +25,11 @@ describe("validateProposal (path safety)", () => {
 
   it("requires string content", () => {
     expect(ok([{ path: "a.txt", content: 5 as unknown as string }])).toBe(false);
+  });
+});
+
+describe("proposalBranch", () => {
+  it("namespaces proposal branches", () => {
+    expect(proposalBranch(123)).toBe("chat/proposal-123");
   });
 });
