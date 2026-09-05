@@ -4,6 +4,7 @@ const LINKS = [
   { to: "/work", label: "Board", end: true },
   { to: "/work/history", label: "History", end: false },
   { to: "/work/requests", label: "Requests", end: false },
+  { to: "/work/inputs", label: "Inputs", end: false },
 ];
 
 export function WorkNav() {
