@@ -3,6 +3,7 @@ import { NavLink } from "react-router";
 const LINKS = [
   { to: "/work", label: "Board", end: true },
   { to: "/work/history", label: "History", end: false },
+  { to: "/work/requests", label: "Requests", end: false },
 ];
 
 export function WorkNav() {
