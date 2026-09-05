@@ -39,8 +39,8 @@ export default function WorkInputs({ loaderData }: Route.ComponentProps) {
 
       <p className="console__notice">
         Every discrete human input, newest first — in-app chat, requests, and feedback, plus
-        terminal (<code>operator-session</code>) prompts captured by the local hook (work-020).
-        Gate (<code>owner-action</code>) capture is still to come.
+        terminal (<code>operator-session</code>) prompts captured by the local hook (work-020). Gate
+        (<code>owner-action</code>) capture is still to come.
       </p>
 
       {spine.length === 0 ? (
