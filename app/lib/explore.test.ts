@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractWikilinks, parseFrontmatter } from "./explore.server";
+import { extractWikilinks, parseFrontmatter, versionSkew } from "./explore.server";
 
 describe("parseFrontmatter", () => {
   it("reads top-level and metadata fields", () => {
@@ -46,5 +46,24 @@ describe("extractWikilinks", () => {
     expect(extractWikilinks("Cross-link with `[[name]]`. Real: [[invariants]].")).toEqual([
       "invariants",
     ]);
+  });
+});
+
+describe("versionSkew", () => {
+  it("returns [] when all present versions agree", () => {
+    expect(versionSkew({ app: "0.15.0", pkg: "0.15.0", changelog: "0.15.0" })).toEqual([]);
+  });
+
+  it("reports every source when they disagree", () => {
+    const skew = versionSkew({ app: "0.13.0", pkg: "0.15.0", changelog: "0.15.0" });
+    expect(skew).toEqual([
+      { source: "version.ts", version: "0.13.0" },
+      { source: "package.json", version: "0.15.0" },
+      { source: "CHANGELOG.md", version: "0.15.0" },
+    ]);
+  });
+
+  it("ignores a source that couldn't be read (null)", () => {
+    expect(versionSkew({ app: "0.15.0", pkg: null, changelog: "0.15.0" })).toEqual([]);
   });
 });

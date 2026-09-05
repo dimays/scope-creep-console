@@ -1,3 +1,4 @@
-/** Kept in sync with package.json and MANIFEST.yaml. Surfaced by /healthz. */
-// This line was landed by the Console chat's approve -> gated-PR flow (work-016).
-export const APP_VERSION = "0.13.0";
+/** The app's release version — kept in sync with package.json and CHANGELOG.md top
+ * entry (checked by `consistency()`). Surfaced by /healthz. (MANIFEST.yaml carries a
+ * separate app-manifest version, not this release number.) */
+export const APP_VERSION = "0.15.0";
