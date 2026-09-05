@@ -1,9 +1,10 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
- * v0.1 schema. One table: a record of Console page visits, enough to prove the
- * Golden Path data layer (Drizzle + libSQL, TypeScript-checked) end to end.
- * Grows via drizzle-kit migrations as the Console earns real features.
+ * The Console schema — the single source of truth for the database. The generated
+ * migrations in `drizzle/` are derived from this file (`bun run db:generate`) and
+ * applied by `ensureSchema()` at bootstrap; never hand-write DDL elsewhere. Six
+ * tables: page_visits, feedback, requests(+messages), conversations(+messages).
  */
 export const pageVisits = sqliteTable("page_visits", {
   id: integer("id").primaryKey({ autoIncrement: true }),
