@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 — 2026-09-05
+- **Dashboard fix** (work-019, from request #2): the Extensions panel now lists
+  registered extensions (was hardcoded to "None installed yet" despite the count).
+  Apps + Extensions entries are clickable, linking out to their repo.
+
+
 ## 0.11.0 — 2026-09-05
 - **Approve → gated PR** (work-016, ADR-009): approving a proposal builds its edits on
   an isolated branch (worktree), pushes it, and opens a gated PR (`/chat/land`) — never
