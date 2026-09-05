@@ -23,14 +23,23 @@ let ready: Promise<void> | undefined;
  * migrations (`bun run db:generate` / `db:migrate`) once it grows.
  */
 export function ensureSchema(): Promise<void> {
-  ready ??= client
-    .execute(
+  ready ??= (async () => {
+    await client.execute(
       `CREATE TABLE IF NOT EXISTS page_visits (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
          path TEXT NOT NULL,
          at INTEGER NOT NULL
        )`,
-    )
-    .then(() => undefined);
+    );
+    await client.execute(
+      `CREATE TABLE IF NOT EXISTS feedback (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         context_key TEXT NOT NULL,
+         rating TEXT NOT NULL,
+         comment TEXT NOT NULL DEFAULT '',
+         at INTEGER NOT NULL
+       )`,
+    );
+  })();
   return ready;
 }

@@ -434,3 +434,11 @@ a.console__item-name:hover {
   background: color-mix(in srgb, #d9822b 16%, transparent);
   color: #d9822b;
 }
+
+/* graft point for the feedback extension */
+.feedback-slot {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 50;
+}
