@@ -5,6 +5,7 @@ export default [
   route("healthz", "routes/healthz.tsx"),
   route("feedback", "routes/feedback.tsx"),
   route("chat", "routes/chat.tsx"),
+  route("chat/send", "routes/chat-send.tsx"),
   route("explore", "routes/explore.tsx"),
   route("explore/docs", "routes/explore-docs.tsx"),
   route("explore/docs/:slug", "routes/explore-doc.tsx"),
