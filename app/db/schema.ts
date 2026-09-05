@@ -43,3 +43,26 @@ export const requestMessages = sqliteTable("request_messages", {
 
 export type Request = typeof requests.$inferSelect;
 export type RequestMessage = typeof requestMessages.$inferSelect;
+
+/**
+ * The shared conversation primitive (ADR-008): threads + messages backing the
+ * chatbot (and, later, Work Requests v2). `kind` distinguishes uses.
+ */
+export const conversations = sqliteTable("conversations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: text("kind").notNull(),
+  title: text("title").notNull().default(""),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const conversationMessages = sqliteTable("conversation_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  conversationId: integer("conversation_id").notNull(),
+  role: text("role").notNull(),
+  body: text("body").notNull(),
+  at: integer("at").notNull(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
