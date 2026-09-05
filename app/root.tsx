@@ -2,6 +2,7 @@ import {
   isRouteErrorResponse,
   Links,
   Meta,
+  NavLink,
   Outlet,
   Scripts,
   ScrollRestoration,
@@ -9,6 +10,21 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+
+function TopNav() {
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    isActive ? "topnav__link topnav__link--active" : "topnav__link";
+  return (
+    <nav className="topnav">
+      <NavLink to="/" end className={linkClass}>
+        Console
+      </NavLink>
+      <NavLink to="/explore" className={linkClass}>
+        Explore
+      </NavLink>
+    </nav>
+  );
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -33,6 +49,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
+        <TopNav />
         {children}
         <ScrollRestoration />
         <Scripts />

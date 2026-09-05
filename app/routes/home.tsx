@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { db, ensureSchema } from "~/db";
 import { pageVisits } from "~/db/schema";
 import { readRegistry } from "~/lib/registry.server";
@@ -46,7 +47,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <ul className="console__list">
             {registry.agents.map((agent) => (
               <li key={agent.name} className="console__item">
-                <span className="console__item-name">{agent.name}</span>
+                <Link to={`/explore/agents/${agent.name}`} className="console__item-name">
+                  {agent.name}
+                </Link>
                 {agent.kind && <span className="console__tag">{agent.kind}</span>}
               </li>
             ))}
