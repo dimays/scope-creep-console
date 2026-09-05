@@ -19,7 +19,7 @@ export function ChatMount({ initialMessages }: { initialMessages: InitialMessage
       placeholder: "Ask about the platform…",
       messages: initialMessages.map((m) => ({ role: normalizeRole(m.role), body: m.body })),
       onSend: async (text) => {
-        const res = await fetch("/chat", {
+        const res = await fetch("/chat/send", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ text }),
