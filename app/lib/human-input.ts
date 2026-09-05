@@ -37,3 +37,11 @@ export function truncate(s: string, n = 140): string {
   const t = s.trim();
   return t.length > n ? `${t.slice(0, n)}…` : t;
 }
+
+/** True when there's more full text (`excerpt`) than the preview `summary` shows,
+ * so the entry is worth an expand affordance. Guards the feedback case where the
+ * summary ("Feedback 👍: …") is longer than a short comment excerpt. */
+export function isExpandable(summary: string, excerpt?: string): boolean {
+  const full = excerpt?.trim();
+  return !!full && full.length > summary.length;
+}
