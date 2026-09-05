@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — 2026-09-04
+- **Work History** (per prd-work-intake §1): a Board/History sub-nav on the Work tab;
+  History lists shipped work newest-first with links to each ticket and its GitHub PR.
+
 ## 0.5.0 — 2026-09-04
 - Graft the **@scope-creep/ext-feedback** extension (pinned `#v0.1.0` via git) onto
   Explore — a non-nagging Shadow-DOM feedback prompt, themed by the host tokens.

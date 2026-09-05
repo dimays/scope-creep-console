@@ -11,5 +11,6 @@ export default [
   route("explore/timeline", "routes/explore-timeline.tsx"),
   route("explore/consistency", "routes/explore-consistency.tsx"),
   route("work", "routes/work.tsx"),
+  route("work/history", "routes/work-history.tsx"),
   route("work/:id", "routes/work-item.tsx"),
 ] satisfies RouteConfig;
