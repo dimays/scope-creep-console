@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.18.0 — 2026-09-06
+- **Thread branching + generated-request cards** (work-032, ADR-012 — Phase 4 of
+  prd-cos-threads): the richest thread interactions, additive on the work-029 conversation
+  primitive with no reshape. A thread can now **branch a tangent into a linked child thread**
+  from a point in a parent — the child carries a new nullable `parentId` + `branchedFromMessageId`
+  (migration `0004`) as the reverse link and split point, and a typed **`branch`** card is dropped
+  in the parent at that point, so the two are **linked both ways** (a "↳ branched from" backlink on
+  the child, an inline branch card plus a derived **Branches** list on the parent). Followups thread
+  cleanly on the child. **Generated feature requests** render as first-class inline **cards** (a new
+  `generated-request` type on the same `conversation_messages.type` discriminator) that deep-link to
+  the ticket/PRD they created; they're org-authored (`agent` role), so they never enter the
+  Human-Input Log. Both new card types reuse the existing outcome-card styling with their own accent.
+
 ## 0.17.0 — 2026-09-06
 - **Model selection — user- and agent-pickable** (work-018, ADR-002): the chat model is
   a choice, not a hardcode. A new **Settings** tab exposes a persisted **model picker**
