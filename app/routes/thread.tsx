@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { InProgress } from "~/components/state";
 import { ThreadReply } from "~/components/thread-reply";
 import { parseMeta, type ThreadMessage, type ThreadStatus } from "~/lib/threads";
 import { addMessage, getThread } from "~/lib/threads.server";
@@ -76,6 +77,12 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           ),
         )}
       </div>
+
+      {status === "working" ? (
+        <p className="console__notice thread-working">
+          <InProgress label="The org is working on this thread…" />
+        </p>
+      ) : null}
 
       {status === "closed" ? (
         <p className="console__notice">

@@ -1,4 +1,5 @@
 import { Form, useNavigation } from "react-router";
+import { SubmitButton } from "~/components/state";
 import { isValidModelId } from "~/lib/models";
 import { CHAT_MODEL_SETTING, readModelCatalog, resolveChatModel } from "~/lib/models.server";
 import { setSetting } from "~/lib/settings.server";
@@ -85,7 +86,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
         </p>
 
         <Form method="post" className="req-form">
-          <select name="chatModel" className="req-input" defaultValue={effective}>
+          <select name="chatModel" className="req-input" defaultValue={effective} disabled={saving}>
             <option value="__default__">Default (env / catalog)</option>
             {models.map((m) => (
               <option key={m.id} value={m.id}>
@@ -95,9 +96,9 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
             ))}
           </select>
           <div className="req-actions">
-            <button type="submit" className="req-submit" disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </button>
+            <SubmitButton pending={saving} pendingLabel="Saving…">
+              Save
+            </SubmitButton>
           </div>
         </Form>
       </section>

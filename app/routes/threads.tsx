@@ -1,4 +1,5 @@
-import { Form, Link, redirect } from "react-router";
+import { Form, Link, redirect, useNavigation } from "react-router";
+import { SubmitButton } from "~/components/state";
 import type { ThreadStatus } from "~/lib/threads";
 import { createThread, listThreads } from "~/lib/threads.server";
 import type { Route } from "./+types/threads";
@@ -34,6 +35,8 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Threads({ loaderData }: Route.ComponentProps) {
   const { threads } = loaderData;
+  const nav = useNavigation();
+  const opening = nav.state !== "idle" && nav.formMethod === "POST";
   return (
     <main className="console">
       <header className="console__header">
@@ -45,17 +48,24 @@ export default function Threads({ loaderData }: Route.ComponentProps) {
       </header>
 
       <Form method="post" className="req-form">
-        <input name="title" className="req-input" placeholder="Start a thread — a title" required />
+        <input
+          name="title"
+          className="req-input"
+          placeholder="Start a thread — a title"
+          disabled={opening}
+          required
+        />
         <textarea
           name="body"
           className="req-textarea"
           placeholder="Ask, tell, or request. The org triages it — declines, refines, routes, or tickets — and every outcome stays a proposal you approve."
+          disabled={opening}
           required
         />
         <div className="req-actions">
-          <button type="submit" className="req-submit">
+          <SubmitButton pending={opening} pendingLabel="Opening…">
             Open thread
-          </button>
+          </SubmitButton>
         </div>
       </Form>
 
