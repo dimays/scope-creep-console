@@ -40,21 +40,26 @@ function fallbackReply(userText: string): string {
   );
 }
 
+function anthropicHeaders(key: string): Record<string, string> {
+  return {
+    "content-type": "application/json",
+    "x-api-key": key,
+    "anthropic-version": "2023-06-01",
+  };
+}
+
+const MODEL = () => process.env.CHAT_MODEL ?? "claude-sonnet-5";
+
 export async function agentRespond(history: AgentMessage[], userText: string): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return fallbackReply(userText);
 
-  const model = process.env.CHAT_MODEL ?? "claude-sonnet-5";
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-      },
+      headers: anthropicHeaders(key),
       body: JSON.stringify({
-        model,
+        model: MODEL(),
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: toAnthropicMessages(history, userText),
@@ -73,4 +78,88 @@ export async function agentRespond(history: AgentMessage[], userText: string): P
   } catch {
     return "The chat runtime couldn't reach Claude (network error). Try again.";
   }
+}
+
+/**
+ * Streaming variant (ADR-013): yields text deltas as Claude produces them, so the
+ * Console can render a reply token-by-token with no browser refresh. Degrades to a
+ * single yielded chunk when there's no key or on any error — i.e. batched-with-indicator
+ * is the automatic floor. Same-process, request-scoped: no websocket/SSE-GET channel.
+ */
+export async function* agentRespondStream(
+  history: AgentMessage[],
+  userText: string,
+): AsyncGenerator<string, void, unknown> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    yield fallbackReply(userText);
+    return;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: anthropicHeaders(key),
+      body: JSON.stringify({
+        model: MODEL(),
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: toAnthropicMessages(history, userText),
+        stream: true,
+      }),
+    });
+  } catch {
+    yield "The chat runtime couldn't reach Claude (network error). Try again.";
+    return;
+  }
+  if (!res.ok || !res.body) {
+    yield `The chat runtime reached Claude but got an error (${res.status}). Check the model or key.`;
+    return;
+  }
+
+  // Parse the SSE stream: events are separated by a blank line; we only care about
+  // `content_block_delta` text_delta events. Anything else is ignored.
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let emitted = false;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      // biome-ignore lint/suspicious/noAssignInExpressions: standard SSE frame split
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        for (const line of frame.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const payload = trimmed.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const evt = JSON.parse(payload) as {
+              type?: string;
+              delta?: { type?: string; text?: string };
+            };
+            if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+              const text = evt.delta.text ?? "";
+              if (text) {
+                emitted = true;
+                yield text;
+              }
+            }
+          } catch {
+            // ignore a malformed frame
+          }
+        }
+      }
+    }
+  } catch {
+    if (!emitted) yield "The chat runtime lost the connection mid-reply. Try again.";
+    return;
+  }
+  if (!emitted) yield "(Claude returned an empty reply.)";
 }

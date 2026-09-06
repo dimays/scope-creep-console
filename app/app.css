@@ -674,6 +674,64 @@ a.console__item-name:hover {
   text-decoration: underline;
 }
 
+/* Live reply (ADR-013): the working indicator + streamed reveal. */
+.thread--live {
+  margin-top: 0.8rem;
+  margin-bottom: 0;
+}
+
+.working {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.working__dots {
+  display: inline-flex;
+  gap: 0.28rem;
+}
+
+.working__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sc-accent);
+  animation: working-breathe 1.2s ease-in-out infinite;
+}
+
+.working__dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.working__dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+.working__label {
+  font-size: 0.85rem;
+  color: var(--sc-muted);
+}
+
+@keyframes working-breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(1px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
+/* Motion is introduced with its escape hatch, on the first touch that adds any. */
+@media (prefers-reduced-motion: reduce) {
+  .working__dot {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 .console__backlink {
   color: var(--sc-accent);
   text-decoration: none;

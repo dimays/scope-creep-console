@@ -7,6 +7,7 @@ export default [
   // CoS-Threads (work-029, ADR-012): the unified, top-level human-input surface.
   route("threads", "routes/threads.tsx"),
   route("threads/:id", "routes/thread.tsx"),
+  route("thread/send", "routes/thread-send.tsx"),
   // Live agent-chat resource + chatbot preview/merge flow (unchanged; ChatMount posts here).
   route("chat/send", "routes/chat-send.tsx"),
   route("chat/preview", "routes/chat-preview.tsx"),

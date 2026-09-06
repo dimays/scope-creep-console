@@ -1,4 +1,5 @@
-import { Form, Link } from "react-router";
+import { Link } from "react-router";
+import { ThreadReply } from "~/components/thread-reply";
 import { parseMeta, type ThreadMessage, type ThreadStatus } from "~/lib/threads";
 import { addMessage, getThread } from "~/lib/threads.server";
 import type { Route } from "./+types/thread";
@@ -82,14 +83,7 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
         </p>
       ) : null}
 
-      <Form method="post" className="req-form">
-        <textarea name="body" className="req-textarea" placeholder="Add to the thread…" required />
-        <div className="req-actions">
-          <button type="submit" className="req-submit">
-            Reply
-          </button>
-        </div>
-      </Form>
+      <ThreadReply threadId={thread.id} status={status} />
     </main>
   );
 }
