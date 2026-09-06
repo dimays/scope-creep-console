@@ -22,6 +22,8 @@ export default [
   route("explore/docs", "routes/explore-docs.tsx"),
   route("explore/docs/:slug", "routes/explore-doc.tsx"),
   route("explore/agents/:name", "routes/explore-agent.tsx"),
+  route("explore/loops", "routes/explore-loops.tsx"),
+  route("explore/loops/:name", "routes/explore-loop.tsx"),
   route("explore/timeline", "routes/explore-timeline.tsx"),
   route("explore/consistency", "routes/explore-consistency.tsx"),
   route("work", "routes/work.tsx"),

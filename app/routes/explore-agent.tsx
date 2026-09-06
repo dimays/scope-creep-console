@@ -51,6 +51,27 @@ export default function ExploreAgent({ loaderData }: Route.ComponentProps) {
       </section>
 
       <section className="doc-group">
+        <div className="console__panel-head">
+          <h2 className="doc-group__title">Loops owned</h2>
+          <span className="console__count">{agent.loopsOwned.length}</span>
+        </div>
+        {agent.loopsOwned.length === 0 ? (
+          <p className="console__empty">This agent owns no loops.</p>
+        ) : (
+          <ul className="console__list">
+            {agent.loopsOwned.map((loop) => (
+              <li key={loop.name} className="doc-row">
+                <Link to={`/explore/loops/${loop.name}`} className="console__item-name">
+                  {loop.name}
+                </Link>
+                {loop.status && <span className="console__tag">{loop.status}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="doc-group">
         <h2 className="doc-group__title">Charter</h2>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted, single-user control-plane markdown */}
         <article className="prose" dangerouslySetInnerHTML={{ __html: agent.charterHtml }} />

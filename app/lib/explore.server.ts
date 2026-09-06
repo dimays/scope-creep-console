@@ -197,6 +197,70 @@ export async function listLedger(): Promise<LedgerEntry[]> {
   return entries.sort((a, b) => b.order - a.order);
 }
 
+export function agentDisplayName(name: string): string {
+  return DISPLAY_NAMES[name] ?? name;
+}
+
+// --- loops (registry/loops.json) -----------------------------------------
+
+export type LoopRecord = {
+  name: string;
+  kind: string;
+  status?: string;
+  description?: string;
+  ownerAgent?: string;
+  path?: string;
+  mode?: string;
+};
+
+/**
+ * Parse `registry/loops.json` into loop records. Pure + unit-tested. Tolerant by
+ * design so "empty is empty" stays honest: malformed JSON, a missing `loops`
+ * array, or entries without a name all collapse to [] / are dropped rather than
+ * throwing. `mode` is optional (only some loops declare it).
+ */
+export function parseLoops(json: string): LoopRecord[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  const loops = (parsed as { loops?: unknown }).loops;
+  if (!Array.isArray(loops)) return [];
+  const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+  return loops
+    .map((raw) => {
+      const l = raw as Record<string, unknown>;
+      return {
+        name: str(l.name) ?? "",
+        kind: str(l.kind) ?? "loop",
+        status: str(l.status),
+        description: str(l.description),
+        ownerAgent: str(l.owner_agent),
+        path: str(l.path),
+        mode: str(l.mode),
+      };
+    })
+    .filter((l) => l.name !== "");
+}
+
+/** Loops in the control-plane registry, or [] when absent/empty/unreadable. */
+export async function listLoops(): Promise<LoopRecord[]> {
+  const src = await readMd(join("registry", "loops.json"));
+  if (src === null) return [];
+  return parseLoops(src);
+}
+
+export async function readLoop(name: string): Promise<LoopRecord | null> {
+  return (await listLoops()).find((l) => l.name === name) ?? null;
+}
+
+/** Cross-link resolution: the loops a given agent owns (`owner_agent`). Pure. */
+export function loopsOwnedBy(loops: LoopRecord[], agent: string): LoopRecord[] {
+  return loops.filter((l) => l.ownerAgent === agent);
+}
+
 export type AgentProfile = {
   name: string;
   displayName: string;
@@ -204,6 +268,7 @@ export type AgentProfile = {
   status?: string;
   charterHtml: string;
   contributions: LedgerEntry[];
+  loopsOwned: LoopRecord[];
 };
 
 export async function readAgent(name: string): Promise<AgentProfile | null> {
@@ -213,7 +278,7 @@ export async function readAgent(name: string): Promise<AgentProfile | null> {
   const docs = await listDocs();
   const charterHtml = await renderMarkdown(body, new Set(docs.map((d) => d.slug)));
 
-  const display = DISPLAY_NAMES[name] ?? name;
+  const display = agentDisplayName(name);
   const contributions: LedgerEntry[] = [];
   for (const entry of await listLedger()) {
     const entrySrc = await readMd(join("ledger", entry.file));
@@ -222,6 +287,8 @@ export async function readAgent(name: string): Promise<AgentProfile | null> {
     }
   }
 
+  const loopsOwned = loopsOwnedBy(await listLoops(), name);
+
   return {
     name,
     displayName: display,
@@ -229,6 +296,7 @@ export async function readAgent(name: string): Promise<AgentProfile | null> {
     status: fm.status,
     charterHtml,
     contributions,
+    loopsOwned,
   };
 }
 
