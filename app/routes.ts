@@ -20,7 +20,16 @@ export default [
   route("explore", "routes/explore.tsx"),
   route("explore/docs", "routes/explore-docs.tsx"),
   route("explore/docs/:slug", "routes/explore-doc.tsx"),
+  // Org & staffing (ADR-017 / prd-org-and-staffing): the reporting tree + template catalog.
+  route("explore/agents", "routes/explore-agents.tsx"),
   route("explore/agents/:name", "routes/explore-agent.tsx"),
+  route("explore/templates", "routes/explore-templates.tsx"),
+  route("explore/templates/:name", "routes/explore-template.tsx"),
+  // Gated authoring into the control plane (spin up employee / author template).
+  route("org/employee/preview", "routes/org-employee-preview.tsx"),
+  route("org/employee/land", "routes/org-employee-land.tsx"),
+  route("org/template/preview", "routes/org-template-preview.tsx"),
+  route("org/template/land", "routes/org-template-land.tsx"),
   route("explore/loops", "routes/explore-loops.tsx"),
   route("explore/loops/:name", "routes/explore-loop.tsx"),
   route("explore/timeline", "routes/explore-timeline.tsx"),

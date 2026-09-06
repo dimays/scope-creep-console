@@ -1382,3 +1382,229 @@ a.console__item-name:hover {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   font-size: 0.8rem;
 }
+
+/* ------------------------------------------------------------------ */
+/* Org & staffing (ADR-017): the reporting tree + gated authoring      */
+/* ------------------------------------------------------------------ */
+
+.org {
+  margin: 0.5rem 0 2rem;
+}
+
+.org__owner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.org__owner-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--sc-accent);
+}
+.org__owner-name {
+  flex: 1;
+}
+
+.org__execs {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1rem;
+  border-left: 2px solid var(--sc-border);
+  margin-left: 0.8rem;
+}
+.org__exec {
+  margin-top: 1rem;
+  padding-left: 0.6rem;
+}
+.org__exec-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.org__exec-name {
+  font-weight: 600;
+  color: var(--sc-text);
+  text-decoration: none;
+}
+.org__exec-name:hover {
+  color: var(--sc-accent);
+}
+.org__counts {
+  font-size: 0.75rem;
+  color: var(--sc-muted);
+}
+.org__empty {
+  margin: 0.3rem 0 0;
+}
+
+.org__reports {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0 0 0 1rem;
+  border-left: 1px dashed var(--sc-border);
+}
+.org__report {
+  margin-top: 0.5rem;
+  padding-left: 0.6rem;
+}
+.org__report-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+a.org__tpl {
+  text-decoration: none;
+}
+
+.org__tickets {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+.org__ticket {
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-muted);
+  text-decoration: none;
+}
+.org__ticket:hover {
+  border-color: var(--sc-accent);
+  color: var(--sc-accent);
+}
+.org__ticket--owner {
+  border-left: 3px solid var(--sc-accent);
+}
+.org__none {
+  font-size: 0.78rem;
+  color: var(--sc-muted);
+  font-style: italic;
+}
+.org__orphans {
+  margin-top: 1.5rem;
+}
+.org__skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0;
+}
+.org__profile-meta a {
+  color: var(--sc-accent);
+  text-decoration: none;
+}
+
+/* Authoring panels */
+.org__authoring {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+.org__authoring > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.org__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin: 0.9rem 0;
+}
+.org__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+.org__form-wide {
+  grid-column: 1 / -1;
+}
+.org__form input,
+.org__form select,
+.org__form textarea {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-bg);
+  color: var(--sc-text);
+}
+.org__form fieldset {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  padding: 0.5rem 0.75rem;
+}
+.org__form legend {
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+  padding: 0 0.3rem;
+}
+.org__hint {
+  font-size: 0.72rem;
+  color: var(--sc-muted);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+.org__tickets-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+.org__form label.org__check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--sc-text);
+}
+.org__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+.org__actions button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--sc-radius);
+  border: 1px solid var(--sc-border);
+  background: var(--sc-bg);
+  color: var(--sc-text);
+  cursor: pointer;
+}
+.org__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.org__actions .org__approve {
+  border-color: var(--sc-accent);
+  color: var(--sc-accent);
+}
+.org__diff {
+  max-height: 22rem;
+  overflow: auto;
+  background: var(--sc-bg);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}

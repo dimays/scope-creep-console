@@ -21,6 +21,8 @@ export type WorkItem = {
   status: WorkStatus;
   priority: string;
   owner: string;
+  /** Employee-agent slugs staffed to this item (ADR-017). Empty when unstaffed. */
+  assignees: string[];
   spec?: string;
   pr?: string;
   created: string;
@@ -52,6 +54,10 @@ function toItem(fm: Record<string, string>, file: string): WorkItem {
     status: (fm.status as WorkStatus) ?? "proposed",
     priority: fm.priority ?? "low",
     owner: fm.owner ?? "",
+    assignees: (fm.assignees ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
     spec: fm.spec || undefined,
     pr: fm.pr || undefined,
     created: fm.created ?? "",

@@ -2,6 +2,8 @@ import { StatusDot } from "@scope-creep/design";
 import { Link } from "react-router";
 import { db, ensureSchema } from "~/db";
 import { pageVisits } from "~/db/schema";
+import { agentDisplayName } from "~/lib/display-name";
+import { readOrg } from "~/lib/org.server";
 import { readRegistry } from "~/lib/registry.server";
 import { needsYouThreads, type ThreadStatus } from "~/lib/threads";
 import { listThreads } from "~/lib/threads.server";
@@ -20,6 +22,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   await db.insert(pageVisits).values({ path: new URL(request.url).pathname, at: Date.now() });
   const visits = await db.select().from(pageVisits);
   const registry = await readRegistry();
+  // Org summary for the Agents panel: execs with their employee headcount (ADR-017).
+  const org = await readOrg();
+  const orgSummary = {
+    execCount: org.tree.execs.length,
+    employeeCount: org.employeeCount,
+    templateCount: org.templates.length,
+    execs: org.tree.execs
+      .map((e) => ({ name: e.name, reports: e.employees.length }))
+      .sort((a, b) => b.reports - a.reports || a.name.localeCompare(b.name)),
+  };
   // Threads card: newest-updated first, with "waiting on you" surfaced to the top.
   const all = await listThreads();
   const threads = all
@@ -29,6 +41,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const needsYou = needsYouThreads(all).length;
   return {
     registry,
+    orgSummary,
     visitCount: visits.length,
     version: APP_VERSION,
     threads,
@@ -38,7 +51,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { registry, visitCount, version, threads, threadCount, needsYou } = loaderData;
+  const { registry, orgSummary, visitCount, version, threads, threadCount, needsYou } = loaderData;
 
   return (
     <main className="console">
@@ -81,16 +94,35 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </Panel>
 
         <Panel title="Agents" count={registry.agents.length}>
-          <ul className="console__list">
-            {registry.agents.map((agent) => (
-              <li key={agent.name} className="console__item">
-                <Link to={`/explore/agents/${agent.name}`} className="console__item-name">
-                  {agent.name}
-                </Link>
-                {agent.kind && <span className="console__tag">{agent.kind}</span>}
-              </li>
-            ))}
-          </ul>
+          <Link to="/explore/agents" className="console__panel-link">
+            {orgSummary.employeeCount > 0
+              ? `Org — ${orgSummary.employeeCount} employee${orgSummary.employeeCount === 1 ? "" : "s"} across ${orgSummary.execCount} execs →`
+              : "Open the org →"}
+          </Link>
+          {orgSummary.execs.length === 0 ? (
+            <p className="console__empty">No agents registered yet.</p>
+          ) : (
+            <ul className="console__list">
+              {orgSummary.execs.map((exec) => (
+                <li key={exec.name} className="console__item">
+                  <Link to={`/explore/agents/${exec.name}`} className="console__item-name">
+                    {agentDisplayName(exec.name)}
+                  </Link>
+                  {exec.reports > 0 && (
+                    <span className="console__tag">
+                      {exec.reports} report{exec.reports === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {orgSummary.templateCount > 0 && (
+            <Link to="/explore/templates" className="console__panel-link">
+              {orgSummary.templateCount} employee template
+              {orgSummary.templateCount === 1 ? "" : "s"} →
+            </Link>
+          )}
         </Panel>
 
         <Panel title="Apps" count={registry.apps.length}>
