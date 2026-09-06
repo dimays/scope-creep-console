@@ -50,6 +50,13 @@
       "when": 1788729464419,
       "tag": "0006_silky_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788731486856,
+      "tag": "0007_retire_console_chat",
+      "breakpoints": true
     }
   ]
 }

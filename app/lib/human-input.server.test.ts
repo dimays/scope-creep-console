@@ -27,11 +27,20 @@ beforeAll(async () => {
   process.env.SCOPE_CREEP_HOME = home; // not a git repo → commitsBetween returns []
 
   // Seed the in-DB owner-input sources on the unified conversation primitive: a
-  // chat-kind thread (→ console-chat) and a request-kind thread (→ work-request).
+  // chat-kind thread (→ console-chat) and a request-kind thread (→ work-request). The
+  // `chat`-kind → console-chat derivation is part of the kept ADR-012 threads model; the
+  // fixture uses a generic chat thread rather than the "Console chat" seed retired in
+  // ADR-019, so the test exercises the derivation without depending on the removed surface.
   const now = 1_700_000_000_000;
   const [chat] = await db
     .insert(conversations)
-    .values({ kind: "chat", title: "Console chat", status: "open", createdAt: now, updatedAt: now })
+    .values({
+      kind: "chat",
+      title: "a chat thread",
+      status: "open",
+      createdAt: now,
+      updatedAt: now,
+    })
     .returning();
   await db.insert(conversationMessages).values({
     conversationId: chat.id,
