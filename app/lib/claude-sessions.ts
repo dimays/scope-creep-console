@@ -57,27 +57,44 @@ export function claudeProjectDirName(cwd: string): string {
 }
 
 /**
- * The documented deep link that opens a NEW Claude Code session in `cwd` with `prompt`
- * prefilled (ADR-016 / work-046). NOTE: the `claude-cli:` scheme is only OS-registered
- * after Claude Code's first interactive run on the machine — the server verifies it
- * (see claude-sessions.server `verifyClaudeCliScheme`) and the UI degrades honestly when
- * it isn't registered.
+ * The Claude Desktop deep-link scheme that hosts Claude Code (`claude://…`). This is the
+ * scheme the Owner's machine actually registers — Claude Code runs embedded in Claude
+ * Desktop, so there is no standalone `claude` binary registering a `claude-cli:` scheme.
+ * Verified: `open -g "claude://code/new?q=…"` returns exit 0. The `folder` argument is
+ * treated as untrusted by the app, so opening one shows a confirmation dialog (expected).
+ */
+export const CLAUDE_DESKTOP_SCHEME = "claude:";
+
+/**
+ * The deep link that opens a NEW Claude Code session (via Claude Desktop) in `cwd` with
+ * `prompt` prefilled (ADR-016 / work-046). Per Anthropic's deep-link docs, `claude://code/new`
+ * accepts `q` (the prompt prefill — placed in the composer, *sent when the human presses
+ * Enter*, not auto-sent) and `folder` (the working directory; treated as untrusted → the app
+ * confirms it). Both values are percent-encoded so the resulting URL is unambiguous, and the
+ * `[scope-creep-thread:<id>]` marker inside `prompt` survives into `q` for correlation
+ * (work-047). NOTE: the `claude:` scheme must be OS-registered (Claude Desktop installed); the
+ * server verifies it (see claude-sessions.server `verifyClaudeCliScheme`) and the UI degrades
+ * honestly to the copyable command when it isn't.
  */
 export function buildDeepLink(opts: { cwd: string; prompt: string }): string {
   const q = encodeURIComponent(opts.prompt);
-  const cwd = encodeURIComponent(opts.cwd);
-  return `claude-cli://open?cwd=${cwd}&q=${q}`;
+  const folder = encodeURIComponent(opts.cwd);
+  return `claude://code/new?q=${q}&folder=${folder}`;
 }
 
-/** A generic deep link that opens Claude Code in the repo with no seeded prompt (the resume/open floor). */
+/**
+ * A generic deep link that opens a NEW Claude Code session in the repo with no seeded prompt
+ * (the resume/open floor). Same `claude://code/new` scheme, `folder` only.
+ */
 export function buildOpenRepoLink(cwd: string): string {
-  return `claude-cli://open?cwd=${encodeURIComponent(cwd)}`;
+  return `claude://code/new?folder=${encodeURIComponent(cwd)}`;
 }
 
 /**
  * The exact shell command to start the same seeded session by hand — the graceful fallback
- * when `claude-cli:` isn't registered (work-046). Double quotes in the prompt are escaped so
- * the command is safe to paste.
+ * for environments where the `claude:` scheme isn't registered (e.g. a deployed Linux Console
+ * with the CLI available; work-046). Double quotes in the prompt are escaped so the command is
+ * safe to paste.
  */
 export function buildCliCommand(opts: { cwd: string; prompt: string }): string {
   const escaped = opts.prompt.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
