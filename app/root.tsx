@@ -29,6 +29,9 @@ function TopNav() {
       <NavLink to="/threads" className={linkClass}>
         Threads
       </NavLink>
+      <NavLink to="/settings" className={linkClass}>
+        Settings
+      </NavLink>
     </nav>
   );
 }

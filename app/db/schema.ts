@@ -64,3 +64,16 @@ export const conversationMessages = sqliteTable("conversation_messages", {
 
 export type Conversation = typeof conversations.$inferSelect;
 export type ConversationMessage = typeof conversationMessages.$inferSelect;
+
+/**
+ * A tiny key/value store for persisted Console settings (work-018). The first key is
+ * `chat_model` — the Owner's picked chat model, which overrides the `CHAT_MODEL` env
+ * default when it's a valid id in the catalog. Single-user by invariant, so no scoping.
+ */
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export type Setting = typeof settings.$inferSelect;

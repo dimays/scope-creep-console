@@ -28,4 +28,6 @@ export default [
   route("work/requests/:id", "routes/work-request.tsx"),
   route("work/inputs", "routes/work-inputs.tsx"),
   route("work/:id", "routes/work-item.tsx"),
+  // Owner settings — model picker (work-018) and future persisted preferences.
+  route("settings", "routes/settings.tsx"),
 ] satisfies RouteConfig;

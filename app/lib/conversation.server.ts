@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations } from "~/db/schema";
 import { type AgentMessage, type AgentRole, agentRespond } from "./agent.server";
+import { effectiveChatModel } from "./models.server";
 
 /**
  * The conversation primitive (ADR-008): persisted threads + an agent turn.
@@ -59,7 +60,8 @@ export async function agentTurn(conversationId: number, userText: string): Promi
   await ensureSchema();
   const history = await listMessages(conversationId);
   await addMessage(conversationId, "owner", userText);
-  const reply = await agentRespond(history, userText);
+  const model = await effectiveChatModel();
+  const reply = await agentRespond(history, userText, { model });
   await addMessage(conversationId, "agent", reply);
   return reply;
 }

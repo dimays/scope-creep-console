@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.17.0 — 2026-09-06
+- **Model selection — user- and agent-pickable** (work-018, ADR-002): the chat model is
+  a choice, not a hardcode. A new **Settings** tab exposes a persisted **model picker**
+  that drives the Console assistant (chat + threads); the pick is stored in a new
+  `settings` key/value table (migration `0002`) and validated against the Owner-curated
+  catalog `reference/models.json` (read via `SCOPE_CREEP_HOME`) — an id not in the catalog
+  is never saved or sent. Resolution order is **persisted pick → `CHAT_MODEL` env →
+  catalog default → hardcoded floor**, so a retired id in any slot falls through cleanly
+  and the app always has a sane default (a committed fallback catalog covers a missing
+  control plane). The **agent model-selection policy** ships as executable code
+  (`selectModelForTask` → routine/chat/agentic tiers from the catalog defaults), so
+  agents/subagents pick per task instead of hardcoding an id. The agent runtime
+  (`agentRespond`/`agentRespondStream`) now takes the resolved model per turn.
+
 ## 0.16.0 — 2026-09-06
 - **CoS-Threads MVP** (work-029, ADR-012): Chat + Work Requests are unified into one
   top-level **Threads** surface on the conversation primitive. The legacy
