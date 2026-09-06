@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import { useState } from "react";
-import { Form, Link, redirect } from "react-router";
-import { InProgress } from "~/components/state";
-import { ThreadReply } from "~/components/thread-reply";
+import { Form, Link, redirect, useNavigation } from "react-router";
+import { ResumePanel, ThreadLauncher } from "~/components/thread-launcher";
+import type { ProjectedTurn } from "~/lib/claude-sessions";
+import { resolveThreadProjection } from "~/lib/claude-sessions.server";
 import {
   parseMeta,
   type ThreadInitiator,
@@ -9,7 +11,14 @@ import {
   type ThreadStatus,
   threadTitle,
 } from "~/lib/threads";
-import { addMessage, branchThread, getThread } from "~/lib/threads.server";
+import {
+  addMessage,
+  branchThread,
+  firstOwnerBody,
+  getThread,
+  launchThread,
+  linkThreadSession,
+} from "~/lib/threads.server";
 import type { Route } from "./+types/thread";
 
 export function meta({ params }: Route.MetaArgs) {
@@ -24,15 +33,37 @@ const TURN: Record<ThreadStatus, string> = {
 };
 
 export async function loader({ params }: Route.LoaderArgs) {
-  const thread = await getThread(Number(params.id));
+  const id = Number(params.id);
+  const thread = await getThread(id);
   if (!thread) throw new Response("Not found", { status: 404 });
-  return thread;
+
+  // The launcher + projected transcript (work-046/047, ADR-016) — reads local Claude Code
+  // session data only, never calls Claude. The seed is the thread's first Owner message.
+  const seed = await firstOwnerBody(id);
+  const projection = await resolveThreadProjection(thread.thread, seed);
+  // Persist a freshly-resolved correlation so later loads project straight from the path.
+  if (projection.newlyResolved && projection.sessionUuid && projection.sessionPath) {
+    await linkThreadSession(id, projection.sessionUuid, projection.sessionPath);
+  }
+  return { ...thread, projection };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const id = Number(params.id);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "reply");
+
+  // Launch this thread into a Claude Code session (work-046). Records the seed message and
+  // stamps the thread as launched; the redirect lands on the launched view, which fires the
+  // deep link (or shows the copyable fallback). No Claude call happens here.
+  if (intent === "launch") {
+    const body = String(form.get("body") ?? "")
+      .trim()
+      .slice(0, 5000);
+    if (!body) return { ok: false };
+    await launchThread(id, body);
+    return redirect(`/threads/${id}`);
+  }
 
   // Branch a tangent into a linked child thread (work-032), then land on the child.
   if (intent === "branch") {
@@ -72,10 +103,14 @@ function authorLabel(msg: ThreadMessage): string {
 }
 
 export default function Thread({ loaderData }: Route.ComponentProps) {
-  const { thread, messages, parent, branches } = loaderData;
+  const { thread, messages, parent, branches, projection } = loaderData;
   const status = thread.status as ThreadStatus;
   const orgInitiated = (thread.initiator as ThreadInitiator) === "org";
   const lastMessageId = messages.at(-1)?.id ?? null;
+  const nav = useNavigation();
+  const launching = nav.state !== "idle" && nav.formData?.get("intent") === "launch";
+  const launched = projection.status !== "not-launched";
+  const seed = messages.find((m) => m.role === "owner" && m.type === "message")?.body ?? "";
 
   return (
     <main className="console">
@@ -108,6 +143,9 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           if (msg.type === "generated-request")
             return <GeneratedRequestCard key={msg.id} msg={msg} />;
           if (msg.type === "branch") return <BranchCard key={msg.id} msg={msg} />;
+          // Once launched, plain messages are shown by the projected transcript below —
+          // render only the typed cards here so the opener isn't duplicated.
+          if (launched) return null;
           return (
             <div key={msg.id} className={`msg msg--${msg.role === "owner" ? "owner" : "agent"}`}>
               <span className="msg__author">{authorLabel(msg)}</span>
@@ -117,26 +155,49 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
         })}
       </div>
 
-      {status === "needs-you" ? (
-        <p className="console__notice thread-needs-you">
-          This thread is waiting on you{orgInitiated ? " — the Chief of Staff opened it" : ""}.
-          Reply below to hand the turn back to the org.
-        </p>
-      ) : null}
+      {/* The launcher (work-046) + projected transcript (work-047), replacing the old
+          in-app chat runtime (ADR-016: the conversation lives in Claude Code, not here). */}
+      {launched ? (
+        <>
+          <section className="doc-group thread-transcript">
+            <h2 className="doc-group__title">
+              Transcript{" "}
+              <span className="console__count">
+                {projection.status === "matched" ? projection.turns.length : "…"}
+              </span>
+            </h2>
+            <p className="thread-transcript__src">
+              Projected from the local Claude Code session — no Claude call.
+            </p>
+            {projection.status === "matched" ? (
+              projection.turns.length > 0 ? (
+                <Transcript turns={projection.turns} />
+              ) : (
+                <p className="console__empty">
+                  The session exists but has no turns yet. Empty is empty.
+                </p>
+              )
+            ) : (
+              <p className="console__empty">
+                Waiting for the Claude Code session to start — no transcript captured yet. It
+                appears here automatically once the session's first message lands.
+              </p>
+            )}
+          </section>
 
-      {status === "working" ? (
-        <p className="console__notice thread-working">
-          <InProgress label="The org is working on this thread…" />
-        </p>
-      ) : null}
-
-      {status === "closed" ? (
-        <p className="console__notice">
-          This thread is closed. Reply to reopen it and hand the turn back to the org.
-        </p>
-      ) : null}
-
-      <ThreadReply threadId={thread.id} status={status} />
+          <ResumePanel
+            threadId={thread.id}
+            deepLink={projection.deepLink}
+            openRepoLink={projection.openRepoLink}
+            cliCommand={projection.cliCommand}
+            resumeCommand={projection.resumeCommand}
+            schemeRegistered={projection.schemeRegistered}
+            matched={projection.status === "matched"}
+          />
+        </>
+      ) : (
+        <ThreadLauncher seed={seed} launching={launching} />
+      )}
 
       {/* Branches list (work-032): child threads split off this one — the forward link. */}
       {branches.length > 0 ? (
@@ -160,6 +221,52 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
       <BranchForm lastMessageId={lastMessageId} />
     </main>
   );
+}
+
+/**
+ * The projected transcript (work-047): owner/agent prose and high-level tool activity,
+ * mapped 1:1 from the local Claude Code session JSONL. Consecutive tool turns collapse into
+ * one compact activity line so a long tool run reads as a single step, never invented prose.
+ */
+function Transcript({ turns }: { turns: ProjectedTurn[] }) {
+  const rows: ReactNode[] = [];
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+    if (t.role === "tool") {
+      const tools: string[] = [];
+      let j = i;
+      while (j < turns.length && turns[j].role === "tool") {
+        if (turns[j].tool) tools.push(turns[j].tool as string);
+        j++;
+      }
+      rows.push(
+        <div key={`tool-${i}`} className="transcript__tool">
+          <span className="transcript__tool-label">tool activity</span>
+          <span className="transcript__tool-list">{summarizeTools(tools)}</span>
+        </div>,
+      );
+      i = j - 1;
+      continue;
+    }
+    rows.push(
+      <div key={`msg-${i}`} className={`msg msg--${t.role === "owner" ? "owner" : "agent"}`}>
+        <span className="msg__author">{t.role === "owner" ? "you" : "chief-of-staff"}</span>
+        <p className="msg__body">{t.text}</p>
+      </div>,
+    );
+  }
+  return <div className="thread thread--transcript">{rows}</div>;
+}
+
+/** "Read ×3, Bash, Edit ×2" — a compact, honest summary of a tool run. */
+function summarizeTools(tools: string[]): string {
+  const counts: Array<[string, number]> = [];
+  for (const name of tools) {
+    const last = counts.at(-1);
+    if (last && last[0] === name) last[1]++;
+    else counts.push([name, 1]);
+  }
+  return counts.map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(", ");
 }
 
 /** Split a tangent into a linked child thread (work-032). */

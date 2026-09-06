@@ -54,6 +54,14 @@ export const conversations = sqliteTable("conversations", {
   initiator: text("initiator").notNull().default("owner"),
   parentId: integer("parent_id"),
   branchedFromMessageId: integer("branched_from_message_id"),
+  // Threads launcher (work-046/047, ADR-016): when the Owner launches a thread into a
+  // Claude Code session, `launchedAt` marks the moment (and flips the in-app input to a
+  // "Resume in Claude" control). `sessionUuid`/`sessionPath` are the correlated local
+  // session JSONL, resolved by marker and persisted here so we never rescan. All nullable:
+  // a thread that was never launched leaves them null.
+  launchedAt: integer("launched_at"),
+  sessionUuid: text("session_uuid"),
+  sessionPath: text("session_path"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

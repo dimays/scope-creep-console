@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.20.0 — 2026-09-06
+- **Threads launcher + transcript projection** (work-046 + work-047, ADR-016): the Threads
+  surface stops being an in-app chat client and becomes a **projection + "open in Claude"
+  launcher** over a conversation that actually happens in a **Claude Code** session — the app
+  makes **zero automated Claude calls** (the ADR-016 hard rule). A thread's **Open in Claude
+  Code** button seeds a NEW session with the typed message via the documented
+  `claude-cli://open?cwd=…&q=…` deep link; after launch the in-app input is replaced by a
+  **Resume in Claude** panel (`claude --resume <id>`). The thread **transcript auto-populates**
+  by projecting the correlated local session JSONL under `~/.claude/projects/` (owner/assistant
+  turns; tool activity summarized at a high level; thinking/tool-results/sidechains skipped;
+  "empty is empty" — turns are never invented). **Thread ↔ session correlation** embeds a compact
+  per-thread marker (`[scope-creep-thread:<id>]`) into the seed prompt and finds the session
+  whose first owner message carries it, persisting the resolved path so it isn't rescanned. The
+  launcher is **honest about scheme registration**: the server verifies `claude-cli:` via a
+  side-effect-free LaunchServices query (never `open`, which would launch), and degrades to a
+  copyable `claude "…"` command when it isn't registered (`SC_CLAUDE_CLI_SCHEME=1|0` overrides
+  for a deployed console). Schema: `conversations` gains nullable `launched_at` / `session_uuid`
+  / `session_path` (migration `0005`). The demoted in-app streaming runtime (work-040 /
+  `agent.server.ts`) is left in place but is no longer the Threads surface (ADR-016). Follow-ups:
+  work-048 link-out cards, work-045 dark-only.
+
 ## 0.19.0 — 2026-09-06
 - **Design-token adoption + `--sc-success` a11y follow-up** (work-043, adopts work-041):
   bump the `@scope-creep/design` pin to **`#v0.2.0`** and retire the last hardcoded status

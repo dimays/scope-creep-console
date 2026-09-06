@@ -15,7 +15,9 @@ export default defineConfig({
     environment: "node",
     include: ["app/**/*.test.ts"],
     // Integration tests hit the data layer against a throwaway in-memory libSQL,
-    // never the real dev db; empty key forces the agent's offline fallback.
-    env: { DATABASE_URL: ":memory:", ANTHROPIC_API_KEY: "" },
+    // never the real dev db; empty key forces the agent's offline fallback. The
+    // claude-cli scheme probe is forced off so tests are deterministic and skip the
+    // slow LaunchServices dump (work-046) — its own unit test still asserts a boolean.
+    env: { DATABASE_URL: ":memory:", ANTHROPIC_API_KEY: "", SC_CLAUDE_CLI_SCHEME: "0" },
   },
 });

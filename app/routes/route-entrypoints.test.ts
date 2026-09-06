@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { action as chatProposeAction } from "./chat-propose";
 import { loader as healthzLoader } from "./healthz";
@@ -98,6 +101,32 @@ describe("route: /threads/:id branching (work-032)", () => {
       params: { id: String(parentId) },
     } as never);
     expect(res).toEqual({ ok: false });
+  });
+
+  it("launch intent marks the thread launched and redirects back to it (work-046)", async () => {
+    // Point session correlation at an empty temp dir — never the Owner's real ~/.claude.
+    const prev = process.env.CLAUDE_PROJECTS_DIR;
+    process.env.CLAUDE_PROJECTS_DIR = mkdtempSync(join(tmpdir(), "sc-route-projects-"));
+    const id = await openThread("Launch flow", "Give me a State of the Product.");
+    const form = new FormData();
+    form.set("intent", "launch");
+    form.set("body", "Give me a State of the Product.");
+    const res = (await threadAction({
+      request: new Request(`http://localhost/threads/${id}`, { method: "POST", body: form }),
+      params: { id: String(id) },
+    } as never)) as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(`/threads/${id}`);
+
+    // The loader now reports a launched projection with launch affordances (no Claude call).
+    const data = await threadLoader({ params: { id: String(id) } } as never);
+    expect(data.thread.launchedAt).toBeTruthy();
+    expect(data.projection.status === "pending" || data.projection.status === "matched").toBe(true);
+    expect(data.projection.deepLink).toContain("claude-cli://open?cwd=");
+    expect(data.projection.status).toBe("pending"); // empty projects dir → nothing correlated
+
+    if (prev === undefined) delete process.env.CLAUDE_PROJECTS_DIR;
+    else process.env.CLAUDE_PROJECTS_DIR = prev;
   });
 });
 
