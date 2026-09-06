@@ -8,7 +8,7 @@ import { SubmitButton } from "~/components/state";
  *    session seeded with the typed message. The in-app input lives here and *only* here.
  *  - `ResumePanel` (launched): the in-app input is gone; this fires the deep link once,
  *    then offers a "Resume in Claude" control plus the copyable fallback command — honest
- *    about whether the `claude-cli:` scheme is actually registered on this machine.
+ *    about whether the `claude:` (Claude Desktop) scheme is actually registered on this machine.
  *
  * Nothing here calls Claude. Opening/resuming is an OS URL-scheme launch (or a copied shell
  * command); the transcript is projected from local session data by the server.
@@ -109,9 +109,8 @@ export function ResumePanel({
         </p>
       ) : (
         <p className="console__notice launcher__notice">
-          The <code>claude-cli:</code> URL scheme isn't registered on this machine, so the Console
-          can't auto-launch Claude Code. Run this command to start the seeded session (it registers
-          the scheme after its first run):
+          The <code>claude:</code> URL scheme (Claude Desktop) isn't registered on this machine, so
+          the Console can't auto-launch Claude Code. Run this command to start the seeded session:
         </p>
       )}
 
