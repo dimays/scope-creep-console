@@ -1,3 +1,4 @@
+import { WorkingIndicator } from "@scope-creep/design";
 import { useEffect, useState } from "react";
 import { useRevalidator } from "react-router";
 import { formatResetEta, type Interruption } from "~/lib/processing";
@@ -64,18 +65,15 @@ export function InProgress({
   label?: string;
   className?: string;
 }) {
+  // WorkingIndicator (design package) owns the breathing dots + the polite announce;
+  // the visible label is shown alongside and hidden from assistive tech so it isn't
+  // read twice. The dots pick up the working-green in this context via CSS.
   return (
-    <span
-      className={className ? `inprogress ${className}` : "inprogress"}
-      role="status"
-      aria-label={label}
-    >
-      <span className="working__dots" aria-hidden="true">
-        <span className="working__dot" />
-        <span className="working__dot" />
-        <span className="working__dot" />
+    <span className={className ? `inprogress ${className}` : "inprogress"}>
+      <WorkingIndicator label={label} />
+      <span className="inprogress__label" aria-hidden="true">
+        {label}
       </span>
-      <span className="inprogress__label">{label}</span>
     </span>
   );
 }

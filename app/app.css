@@ -202,7 +202,7 @@ body {
 .explore-card {
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.15s ease;
+  transition: border-color var(--sc-motion) var(--sc-ease);
 }
 
 .explore-card:hover {
@@ -402,7 +402,7 @@ a.console__item-name:hover {
   border-radius: 9px;
   padding: 0.7rem 0.8rem;
   margin-bottom: 0.6rem;
-  transition: border-color 0.15s ease;
+  transition: border-color var(--sc-motion) var(--sc-ease);
 }
 
 .card:hover {
@@ -614,8 +614,8 @@ a.console__item-name:hover {
 }
 
 .thread-status--working {
-  background: color-mix(in srgb, #3aa76d 20%, transparent);
-  color: #3aa76d;
+  background: color-mix(in srgb, var(--sc-success) 20%, transparent);
+  color: var(--sc-success);
 }
 
 .thread-status--open {
@@ -643,16 +643,19 @@ a.console__item-name:hover {
 
 /* The org opened this thread (work-030) — a warm marker so the CoS voice is legible. */
 .thread-row__initiator {
-  background: color-mix(in srgb, #e8833a 16%, transparent);
-  color: #e8833a;
+  background: color-mix(in srgb, var(--sc-attention) 16%, transparent);
+  color: var(--sc-attention);
 }
 
 /* The "needs-you" queue section — a warm rule so the Owner's turn stands apart. */
 .thread-queue .doc-group__title {
-  color: #e8833a;
+  color: var(--sc-attention);
 }
 
-/* A single status dot. Orange = the thread is waiting on you (needs-you). */
+/* A single status dot. Now backed by the design package's StatusDot primitive
+   (work-043): the app colors it from the status token via the data-sc-status hook
+   the primitive stamps, and the primitive owns the accessible-name contract. Orange
+   = the thread is waiting on you (needs-you). */
 .thread-dot {
   flex: none;
   width: 9px;
@@ -661,20 +664,20 @@ a.console__item-name:hover {
   background: var(--sc-border);
 }
 
-.thread-dot--needs-you {
-  background: #e8833a;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #e8833a 22%, transparent);
+.thread-dot[data-sc-status="needs-you"] {
+  background: var(--sc-attention);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-attention) 22%, transparent);
 }
 
-.thread-dot--working {
-  background: #3aa76d;
+.thread-dot[data-sc-status="working"] {
+  background: var(--sc-success);
 }
 
-.thread-dot--closed {
+.thread-dot[data-sc-status="closed"] {
   background: var(--sc-border);
 }
 
-.thread-dot--open {
+.thread-dot[data-sc-status="open"] {
   background: var(--sc-muted);
 }
 
@@ -702,24 +705,33 @@ a.console__item-name:hover {
   gap: 0.55rem;
 }
 
-.working__dots {
+/* The breathing dots are now the design package's WorkingIndicator primitive
+   (work-043): it owns the polite live-region announce; the app keeps the look on
+   the data-sc-working-dot* hooks it stamps. Duration/easing ride the shared motion
+   tokens, so reduced motion is honored centrally (tokens.css), not per-component. */
+[data-sc-working] {
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-sc-working-dots] {
   display: inline-flex;
   gap: 0.28rem;
 }
 
-.working__dot {
+[data-sc-working-dot] {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--sc-accent);
-  animation: working-breathe 1.2s ease-in-out infinite;
+  animation: working-breathe var(--sc-motion-slow) var(--sc-ease-breathe) infinite;
 }
 
-.working__dot:nth-child(2) {
+[data-sc-working-dot]:nth-child(2) {
   animation-delay: 0.16s;
 }
 
-.working__dot:nth-child(3) {
+[data-sc-working-dot]:nth-child(3) {
   animation-delay: 0.32s;
 }
 
@@ -737,14 +749,6 @@ a.console__item-name:hover {
   50% {
     opacity: 1;
     transform: translateY(-1px);
-  }
-}
-
-/* Motion is introduced with its escape hatch, on the first touch that adds any. */
-@media (prefers-reduced-motion: reduce) {
-  .working__dot {
-    animation: none;
-    opacity: 0.7;
   }
 }
 
@@ -806,20 +810,20 @@ a.console__item-name:hover {
 
 /* Generated feature request card (work-032): green accent — an org-created artifact. */
 .outcome-card--genreq {
-  border-left-color: #3aa76d;
+  border-left-color: var(--sc-success);
 }
 
 .outcome-card--genreq .outcome-card__badge {
-  color: #3aa76d;
+  color: var(--sc-success);
 }
 
 /* Branch marker card (work-032): warm accent — a tangent split into a child thread. */
 .outcome-card--branch {
-  border-left-color: #e8833a;
+  border-left-color: var(--sc-attention);
 }
 
 .outcome-card--branch .outcome-card__badge {
-  color: #e8833a;
+  color: var(--sc-attention);
 }
 
 /* Branch backlink under a child thread's title. */
@@ -835,7 +839,7 @@ a.console__item-name:hover {
 }
 
 .thread-dot--branch {
-  background: #e8833a;
+  background: var(--sc-attention);
 }
 
 /* Branch-a-tangent affordance below the reply box. */
@@ -914,8 +918,8 @@ a.console__item-name:hover {
 }
 
 .chip--feedback {
-  background: color-mix(in srgb, #3aa76d 16%, transparent);
-  color: #3aa76d;
+  background: color-mix(in srgb, var(--sc-success) 16%, transparent);
+  color: var(--sc-success);
 }
 
 .input-when {
@@ -988,10 +992,10 @@ a.console__item-name:hover {
 
 /* ────────────────────────────────────────────────────────────────────────
  * App-state clarity & polish (work-011): one vocabulary for loading /
- * in-progress / interrupted. Uses the currently-pinned @scope-creep/design
- * v0.1.0 tokens; the green working accent reuses the literal already used by
- * the thread working/live indicators above. Follow-up: adopt the v0.2.0
- * --sc-success / --sc-attention / motion tokens once that tag is cut.
+ * in-progress / interrupted. The green working accent now routes through the
+ * shared --sc-success status token (@scope-creep/design v0.2.0, work-043), so
+ * no status color is hardcoded here and dark mode gets the token's brighter
+ * on-dark value for free.
  * ──────────────────────────────────────────────────────────────────────── */
 
 /* Row that holds a form's submit button (settings / threads / thread-reply). */
@@ -1040,7 +1044,7 @@ a.console__item-name:hover {
 
 .inprogress__label {
   font-size: 0.78rem;
-  color: #3aa76d;
+  color: var(--sc-success);
   font-weight: 600;
 }
 
@@ -1055,8 +1059,8 @@ a.console__item-name:hover {
 }
 
 /* In-progress uses the working-green dots even in the card context. */
-.inprogress .working__dot {
-  background: #3aa76d;
+.inprogress [data-sc-working-dot] {
+  background: var(--sc-success);
 }
 
 /* "Blocked" pill — a steady warn dot; work is waiting, not progressing. */
@@ -1077,27 +1081,27 @@ a.console__item-name:hover {
 }
 
 /* The thread-list working dot gently pulses so "actively working" reads at a glance. */
-.thread-dot--working {
+.thread-dot[data-sc-status="working"] {
   animation: sc-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes sc-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, #3aa76d 45%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--sc-success) 45%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, #3aa76d 0%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--sc-success) 0%, transparent);
   }
 }
 
 .thread-working {
-  border-left-color: #3aa76d;
+  border-left-color: var(--sc-success);
 }
 
 /* The thread is parked on you (needs-you) — warm accent, matching the status dot. */
 .thread-needs-you {
-  border-left-color: #e8833a;
+  border-left-color: var(--sc-attention);
   color: var(--sc-text, inherit);
 }
 
@@ -1164,20 +1168,14 @@ a.console__item-name:hover {
 .app-shell[data-interrupted] {
   opacity: 0.5;
   filter: grayscale(0.35);
-  transition: opacity 0.2s ease;
+  transition: opacity var(--sc-motion) var(--sc-ease);
 }
 
-/* Every animation this ticket adds respects reduced motion. */
-@media (prefers-reduced-motion: reduce) {
-  .spinner,
-  .thread-dot--working,
-  .interrupted__icon {
-    animation: none;
-  }
-  .app-shell[data-interrupted] {
-    transition: none;
-  }
-}
+/* Reduced motion is a CONTRACT owned centrally by @scope-creep/design's tokens.css
+   (work-041): the motion tokens collapse to ~0 and a global safety-net reset stills
+   every animation/transition under prefers-reduced-motion. The per-component
+   overrides that used to live here (spinner, working dot, interrupted icon, shell
+   transition) are now redundant and were removed (work-043). */
 
 /* work-017 — the Propose surface: agent-drafted, isolated diff → gated PR.
    Add/remove colors are a new diff semantic; a green isn't in the token set yet, so

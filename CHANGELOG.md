@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.19.0 — 2026-09-06
+- **Design-token adoption + `--sc-success` a11y follow-up** (work-043, adopts work-041):
+  bump the `@scope-creep/design` pin to **`#v0.2.0`** and retire the last hardcoded status
+  colors. Every `#3aa76d` → **`var(--sc-success)`** and every `#e8833a` → **`var(--sc-attention)`**
+  (thread dots, working/needs-you status, feedback chip, genreq/branch cards), so no status
+  color is hardcoded in the app and **dark mode inherits the token's brighter on-dark value
+  for free**. Hover/breathe timings ride the shared **motion tokens** (`--sc-motion*` /
+  `--sc-ease*`), and the two per-component `@media (prefers-reduced-motion)` blocks are gone —
+  reduced motion is now the package's central contract (token-collapse + a global reset in
+  `tokens.css`), not a per-component guess. Adopts three headless primitives at their call
+  sites: **StatusDot** (Threads list + home dots — the color-only home dot now carries an
+  accessible name), and **WorkingIndicator** (the live thread reply + the shared `InProgress`
+  indicator — one polite live-region announce, dots on the motion tokens). The diff add/del
+  literals (work-017) stay as-is — a distinct diff semantic, not a status color, and not yet
+  in the token set. **A11y note (work-043):** v0.2.0's `--sc-success` resolves the deferred
+  contrast issue in **dark** mode (~7.4:1 on surface) but **not light** mode — as small text
+  on white it measures **~3.0:1** (below WCAG AA 4.5:1 for normal text; ~2.5:1 over the chip
+  tint). This is a **shared-package** fix (darken light `--sc-success` for text, or add an
+  on-surface text variant), not a console hardcode, so it is flagged for a `@scope-creep/design`
+  follow-up rather than patched here.
+
 ## 0.18.0 — 2026-09-06
 - **Thread branching + generated-request cards** (work-032, ADR-012 — Phase 4 of
   prd-cos-threads): the richest thread interactions, additive on the work-029 conversation

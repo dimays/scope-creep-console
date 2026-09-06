@@ -1,6 +1,6 @@
 {
   "name": "scope-creep-console",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -25,7 +25,7 @@
     "@libsql/client": "^0.14.0",
     "@react-router/node": "8.3.1",
     "@react-router/serve": "8.3.1",
-    "@scope-creep/design": "github:dimays/scope-creep-design#v0.1.0",
+    "@scope-creep/design": "github:dimays/scope-creep-design#v0.2.0",
     "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0",
     "@scope-creep/ext-chatbot": "github:dimays/scope-creep-ext-chatbot#v0.1.0",
     "drizzle-orm": "^0.36.4",
