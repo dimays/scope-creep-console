@@ -1,3 +1,4 @@
+import { StatusDot } from "@scope-creep/design";
 import { Link } from "react-router";
 import { db, ensureSchema } from "~/db";
 import { pageVisits } from "~/db/schema";
@@ -69,7 +70,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <ul className="console__list">
               {threads.map((t) => (
                 <li key={t.id} className="console__item">
-                  <span className={`thread-dot thread-dot--${t.status}`} aria-hidden="true" />
+                  <StatusDot status={t.status} className="thread-dot" />
                   <Link to={`/threads/${t.id}`} className="console__item-name">
                     {t.title || "Untitled thread"}
                   </Link>

@@ -1,3 +1,4 @@
+import { StatusDot } from "@scope-creep/design";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { SubmitButton } from "~/components/state";
 import { groupThreads, type Thread, type ThreadInitiator, type ThreadStatus } from "~/lib/threads";
@@ -136,13 +137,10 @@ function ThreadRow({ thread }: { thread: Thread }) {
   const orgInitiated = (thread.initiator as ThreadInitiator) === "org";
   return (
     <li className="thread-row">
-      {/* A single status dot — orange means the thread is waiting on you. */}
-      <span
-        className={`thread-dot thread-dot--${status}`}
-        role="img"
-        title={turn}
-        aria-label={turn}
-      />
+      {/* A single status dot — orange means the thread is waiting on you. The
+          StatusDot primitive carries the accessible name; we keep the Owner-facing
+          "turn" phrasing ("Your turn" / "Org working") as its label + tooltip. */}
+      <StatusDot status={status} label={turn} title={turn} className="thread-dot" />
       <Link to={`/threads/${thread.id}`} className="console__item-name thread-row__title">
         {thread.title || "Untitled thread"}
       </Link>

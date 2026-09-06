@@ -1,3 +1,4 @@
+import { WorkingIndicator as DesignWorkingIndicator } from "@scope-creep/design";
 import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 
@@ -113,14 +114,15 @@ function WorkingIndicator() {
     const t = setInterval(() => setI((n) => (n + 1) % LABELS.length), 2200);
     return () => clearInterval(t);
   }, []);
+  // The design package's WorkingIndicator owns the breathing dots + the polite
+  // live-region announce (once). The cycling status line is decorative flavor on
+  // top, so it's hidden from assistive tech to avoid a chatty re-announce.
   return (
-    <span className="working" role="status" aria-label="Chief of Staff is working">
-      <span className="working__dots" aria-hidden="true">
-        <span className="working__dot" />
-        <span className="working__dot" />
-        <span className="working__dot" />
+    <span className="working">
+      <DesignWorkingIndicator label="Chief of Staff is working" />
+      <span className="working__label" aria-hidden="true">
+        {LABELS[i]}
       </span>
-      <span className="working__label">{LABELS[i]}</span>
     </span>
   );
 }
