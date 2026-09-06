@@ -1,17 +1,16 @@
 import { desc, eq } from "drizzle-orm";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations } from "~/db/schema";
-import { type AgentMessage, agentRespondStream } from "./agent.server";
-import { effectiveChatModel } from "./models.server";
 import type { BranchLink, MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
 
 /**
  * CoS-Threads data layer (work-029, ADR-012). A **thread** is a `conversation`; its
  * timeline is `conversation_messages` (plain `message` rows + typed `outcome` cards).
- * This unifies the old Chat + Work Requests surfaces onto one model. The Chief of Staff
- * replies live via `threadReplyStream` (ADR-013 streaming turn); async operator triage
- * still layers typed `outcome` cards on top. Pure types + `parseMeta` live in the
- * client-safe ./threads module.
+ * This unifies the old Chat + Work Requests surfaces onto one model. The conversation
+ * itself happens in a Claude Code session, launched from the thread and projected back
+ * into the timeline (work-046/047, ADR-016) — this layer makes zero automated Claude
+ * calls. Async operator triage layers typed `outcome` cards on top. Pure types +
+ * `parseMeta` live in the client-safe ./threads module.
  */
 
 export type {
@@ -341,41 +340,4 @@ export async function setStatus(threadId: number, status: ThreadStatus): Promise
     .update(conversations)
     .set({ status, updatedAt: Date.now() })
     .where(eq(conversations.id, threadId));
-}
-
-/** Prior plain-text turns for the agent's context (typed outcome cards are excluded). */
-async function threadHistory(threadId: number): Promise<AgentMessage[]> {
-  const rows = await db
-    .select()
-    .from(conversationMessages)
-    .where(eq(conversationMessages.conversationId, threadId))
-    .orderBy(conversationMessages.at);
-  return rows
-    .filter((r) => r.type === "message")
-    .map((r) => ({ role: r.role === "owner" ? "owner" : "agent", body: r.body }) as AgentMessage);
-}
-
-/**
- * The Chief of Staff's live reply turn (ADR-013). Persists the Owner's message
- * (flipping the turn to `working`), streams the CoS reply token-by-token to the caller,
- * then persists the full reply and flips the turn back to the Owner (`needs-you`). The
- * stream degrades to a single chunk with no API key or on error — batched is the floor.
- */
-export async function* threadReplyStream(
-  threadId: number,
-  userText: string,
-): AsyncGenerator<string, void, unknown> {
-  await ensureSchema();
-  const history = await threadHistory(threadId);
-  await addMessage(threadId, "owner", userText); // persists + flips turn to `working`
-  const model = await effectiveChatModel();
-  let full = "";
-  for await (const delta of agentRespondStream(history, userText, { model })) {
-    full += delta;
-    yield delta;
-  }
-  await addMessage(threadId, "agent", full.trim() || "(no reply)", {
-    status: "needs-you",
-    meta: { author: "chief-of-staff" },
-  });
 }

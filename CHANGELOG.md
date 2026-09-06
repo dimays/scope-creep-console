@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.21.0 — 2026-09-06
+- **Finish the ADR-016 demotion of the in-app Threads chat runtime** (follow-up to work-046 +
+  work-047): the launcher + local-JSONL transcript projection (#32) replaced the in-app
+  streaming reply chain on the thread page, orphaning it. That PR deliberately left the dead
+  code in place ("demoted, not deleted") to keep the blast radius small; this change deletes it.
+  Removed: `app/components/thread-reply.tsx` (`ThreadReply`, no importers), the `/thread/send`
+  resource route (`app/routes/thread-send.tsx` + its `routes.ts` line, only ever called by
+  `ThreadReply`), and `threadReplyStream` + its private `threadHistory` helper from
+  `threads.server.ts` — the last Threads-reachable caller of the Anthropic Messages API
+  (`agentRespondStream`). The stale ADR-013 streaming-turn references in the `threads.server.ts`
+  module doc comment and the `.req-actions` CSS comment are updated accordingly. **No behavior
+  change**: none of this was reachable after ADR-016. `agent.server.ts` is untouched — its
+  `agentRespond` / `toAnthropicMessages` remain in use by the conversation/propose paths and the
+  chatbot extension's own API-keyed, ToS-clean build-tool path (ADR-016). `agentRespondStream`
+  now has no in-repo callers but is left exported in agent.server rather than reshape it here.
+
 ## 0.20.0 — 2026-09-06
 - **Threads launcher + transcript projection** (work-046 + work-047, ADR-016): the Threads
   surface stops being an in-app chat client and becomes a **projection + "open in Claude"

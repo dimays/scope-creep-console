@@ -998,7 +998,7 @@ a.console__item-name:hover {
  * on-dark value for free.
  * ──────────────────────────────────────────────────────────────────────── */
 
-/* Row that holds a form's submit button (settings / threads / thread-reply). */
+/* Row that holds a form's submit button (settings / threads). */
 .req-actions {
   display: flex;
   align-items: center;
