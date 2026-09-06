@@ -1,7 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { marked } from "marked";
+import { agentDisplayName, DISPLAY_NAMES } from "./display-name";
+import { type TicketRef, ticketsFor } from "./org.server";
+import { readRegistry } from "./registry.server";
 import { APP_VERSION } from "./version";
+import { listWork } from "./work.server";
 
 /**
  * Reads the Scope Creep control plane (docs, agents, ledger, registries) so the
@@ -12,15 +16,6 @@ import { APP_VERSION } from "./version";
 function home(): string {
   return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
 }
-
-const DISPLAY_NAMES: Record<string, string> = {
-  "chief-of-staff": "Chief of Staff",
-  cto: "CTO",
-  "chief-designer": "Chief Designer",
-  "chief-knowledge-manager": "Chief Knowledge Manager",
-  "chief-product-officer": "Chief Product Officer",
-  "chief-reality-officer": "Chief Reality Officer",
-};
 
 const DOC_DIRS: Array<{ dir: string; group: string }> = [
   { dir: "charter", group: "Charter" },
@@ -197,9 +192,7 @@ export async function listLedger(): Promise<LedgerEntry[]> {
   return entries.sort((a, b) => b.order - a.order);
 }
 
-export function agentDisplayName(name: string): string {
-  return DISPLAY_NAMES[name] ?? name;
-}
+export { agentDisplayName };
 
 // --- loops (registry/loops.json) -----------------------------------------
 
@@ -261,6 +254,8 @@ export function loopsOwnedBy(loops: LoopRecord[], agent: string): LoopRecord[] {
   return loops.filter((l) => l.ownerAgent === agent);
 }
 
+export type AgentDirectReport = { name: string; template?: string; status?: string };
+
 export type AgentProfile = {
   name: string;
   displayName: string;
@@ -269,16 +264,28 @@ export type AgentProfile = {
   charterHtml: string;
   contributions: LedgerEntry[];
   loopsOwned: LoopRecord[];
+  // Org fields (ADR-017):
+  kind?: string;
+  reportsTo?: string;
+  template?: string;
+  /** Employees reporting to this agent (execs only). */
+  directReports: AgentDirectReport[];
+  /** Tickets this agent owns or is staffed to. */
+  staffing: TicketRef[];
 };
 
 export async function readAgent(name: string): Promise<AgentProfile | null> {
-  const src = await readMd(join("agents", `${name}.md`));
+  // Resolve the manifest path via the registry so employees (agents/employees/*.md)
+  // and core agents (agents/*.md) both work; fall back to the flat path.
+  const registry = await readRegistry();
+  const entry = registry.agents.find((a) => a.name === name);
+  const src = await readMd(entry?.path ?? join("agents", `${name}.md`));
   if (src === null) return null;
   const { fm, body } = parseFrontmatter(src);
   const docs = await listDocs();
   const charterHtml = await renderMarkdown(body, new Set(docs.map((d) => d.slug)));
 
-  const display = agentDisplayName(name);
+  const display = DISPLAY_NAMES[name] ?? firstHeading(body, agentDisplayName(name));
   const contributions: LedgerEntry[] = [];
   for (const entry of await listLedger()) {
     const entrySrc = await readMd(join("ledger", entry.file));
@@ -288,15 +295,62 @@ export async function readAgent(name: string): Promise<AgentProfile | null> {
   }
 
   const loopsOwned = loopsOwnedBy(await listLoops(), name);
+  const directReports: AgentDirectReport[] = registry.agents
+    .filter((a) => a.kind === "employee" && a.reports_to === name)
+    .map((a) => ({ name: a.name, template: a.template, status: a.status }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const staffing = registry.available ? ticketsFor(name, await listWork()) : [];
 
   return {
     name,
     displayName: display,
-    description: fm.description ?? "",
-    status: fm.status,
+    description: fm.description ?? entry?.description ?? "",
+    status: fm.status ?? entry?.status,
     charterHtml,
     contributions,
     loopsOwned,
+    kind: entry?.kind,
+    reportsTo: entry?.reports_to,
+    template: entry?.template,
+    directReports,
+    staffing,
+  };
+}
+
+export type TemplateProfile = {
+  name: string;
+  displayName: string;
+  description: string;
+  status?: string;
+  defaultModel?: string;
+  skills: string[];
+  manualHtml: string;
+  /** Employees instantiated from this template. */
+  roster: { name: string; reportsTo?: string; status?: string }[];
+};
+
+/** An employee template's profile: its operating manual + the roster instantiated from it. */
+export async function readTemplate(name: string): Promise<TemplateProfile | null> {
+  const registry = await readRegistry();
+  const entry = registry.templates.find((t) => t.name === name);
+  const src = await readMd(entry?.path ?? join("agents", "templates", `${name}.md`));
+  if (src === null) return null;
+  const { fm, body } = parseFrontmatter(src);
+  const docs = await listDocs();
+  const manualHtml = await renderMarkdown(body, new Set(docs.map((d) => d.slug)));
+  const roster = registry.agents
+    .filter((a) => a.kind === "employee" && a.template === name)
+    .map((a) => ({ name: a.name, reportsTo: a.reports_to, status: a.status }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return {
+    name,
+    displayName: firstHeading(body, name),
+    description: fm.description ?? entry?.description ?? "",
+    status: fm.status ?? entry?.status,
+    defaultModel: entry?.default_model,
+    skills: entry?.skills ?? [],
+    manualHtml,
+    roster,
   };
 }
 

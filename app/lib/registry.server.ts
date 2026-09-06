@@ -10,8 +10,22 @@ import { join } from "node:path";
 
 export type RegistryAgent = {
   name: string;
-  kind?: string;
+  kind?: string; // "core" | "employee" (functional agents are also "core")
   status?: string;
+  description?: string;
+  path?: string;
+  // Employee-only (ADR-017): the exec that spun it up + the template it came from.
+  reports_to?: string;
+  template?: string;
+};
+
+export type EmployeeTemplate = {
+  name: string;
+  kind?: string; // "template"
+  status?: string;
+  description?: string;
+  default_model?: string;
+  skills?: string[];
   path?: string;
 };
 
@@ -32,6 +46,7 @@ export type Registry = {
   home: string;
   available: boolean;
   agents: RegistryAgent[];
+  templates: EmployeeTemplate[];
   apps: RegistryApp[];
   extensions: RegistryExtension[];
 };
@@ -47,8 +62,14 @@ async function readJson<T>(path: string): Promise<T> {
 export async function readRegistry(): Promise<Registry> {
   const home = controlPlaneHome();
   try {
-    const [agents, apps, extensions] = await Promise.all([
+    const [agents, templates, apps, extensions] = await Promise.all([
       readJson<{ agents?: RegistryAgent[] }>(join(home, "registry", "agents.json")),
+      // employee-templates.json is newer than the other registries; tolerate its absence
+      // (older control planes) so the Console degrades to "no templates" rather than
+      // reporting the whole control plane unavailable.
+      readJson<{ templates?: EmployeeTemplate[] }>(
+        join(home, "registry", "employee-templates.json"),
+      ).catch(() => ({ templates: [] as EmployeeTemplate[] })),
       readJson<{ apps?: RegistryApp[] }>(join(home, "registry", "apps.json")),
       readJson<{ extensions?: RegistryExtension[] }>(join(home, "registry", "extensions.json")),
     ]);
@@ -56,10 +77,11 @@ export async function readRegistry(): Promise<Registry> {
       home,
       available: true,
       agents: agents.agents ?? [],
+      templates: templates.templates ?? [],
       apps: apps.apps ?? [],
       extensions: extensions.extensions ?? [],
     };
   } catch {
-    return { home, available: false, agents: [], apps: [], extensions: [] };
+    return { home, available: false, agents: [], templates: [], apps: [], extensions: [] };
   }
 }

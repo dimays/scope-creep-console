@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { action as chatProposeAction } from "./chat-propose";
 import { loader as healthzLoader } from "./healthz";
+import { action as employeePreviewAction } from "./org-employee-preview";
+import { action as templatePreviewAction } from "./org-template-preview";
 import { loader as proposeLoader } from "./propose";
 import { action as settingsAction, loader as settingsLoader } from "./settings";
 import { action as threadAction, loader as threadLoader } from "./thread";
@@ -212,5 +214,52 @@ describe("route: /work/requests (legacy redirect)", () => {
     const res = requestsRedirect() as Response;
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/threads");
+  });
+});
+
+describe("route: /org/employee/preview (ADR-017 gated authoring)", () => {
+  it("rejects an invalid slug before touching git", async () => {
+    const res = (await employeePreviewAction({
+      request: new Request("http://localhost/org/employee/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Bad Name",
+          template: "x",
+          reportsTo: "cto",
+          description: "d",
+        }),
+      }),
+    } as never)) as Response;
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/kebab-case/);
+  });
+
+  it("rejects a missing template", async () => {
+    const res = (await employeePreviewAction({
+      request: new Request("http://localhost/org/employee/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "ada", reportsTo: "cto", description: "d" }),
+      }),
+    } as never)) as Response;
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("route: /org/template/preview (ADR-017 gated authoring)", () => {
+  it("rejects a missing description before touching git", async () => {
+    const res = (await templatePreviewAction({
+      request: new Request("http://localhost/org/template/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "data-analyst", ownerAgent: "cto" }),
+      }),
+    } as never)) as Response;
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.error).toMatch(/description/);
   });
 });

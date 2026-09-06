@@ -15,19 +15,83 @@ export async function loader({ params }: Route.LoaderArgs) {
 
 export default function ExploreAgent({ loaderData }: Route.ComponentProps) {
   const agent = loaderData;
+  const isEmployee = agent.kind === "employee";
   return (
     <main className="console">
       <header className="console__header">
         <div>
-          <p className="console__eyebrow">Agent{agent.status ? ` · ${agent.status}` : ""}</p>
+          <p className="console__eyebrow">
+            {isEmployee ? "Employee" : "Agent"}
+            {agent.status ? ` · ${agent.status}` : ""}
+          </p>
           <h1 className="console__title">{agent.displayName}</h1>
         </div>
-        <Link to="/" className="console__meta">
-          ← dashboard
+        <Link to="/explore/agents" className="console__meta">
+          ← org
         </Link>
       </header>
       <ExploreNav />
       <p className="doc-path">{agent.description}</p>
+
+      {(agent.reportsTo || agent.template) && (
+        <p className="console__meta org__profile-meta">
+          {agent.reportsTo && (
+            <>
+              reports to <Link to={`/explore/agents/${agent.reportsTo}`}>{agent.reportsTo}</Link>
+            </>
+          )}
+          {agent.reportsTo && agent.template && " · "}
+          {agent.template && (
+            <>
+              template <Link to={`/explore/templates/${agent.template}`}>{agent.template}</Link>
+            </>
+          )}
+        </p>
+      )}
+
+      <section className="doc-group">
+        <div className="console__panel-head">
+          <h2 className="doc-group__title">Staffed to</h2>
+          <span className="console__count">{agent.staffing.length}</span>
+        </div>
+        {agent.staffing.length === 0 ? (
+          <p className="console__empty">Not staffed to any tickets.</p>
+        ) : (
+          <ul className="console__list">
+            {agent.staffing.map((t) => (
+              <li key={t.id} className="doc-row">
+                <Link to={`/work/${t.id}`} className="console__item-name">
+                  {t.title}
+                </Link>
+                <span className="console__tag">{t.role === "owner" ? "owner" : "staffed"}</span>
+                <span className="console__tag">{t.status}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {agent.directReports.length > 0 && (
+        <section className="doc-group">
+          <div className="console__panel-head">
+            <h2 className="doc-group__title">Direct reports</h2>
+            <span className="console__count">{agent.directReports.length}</span>
+          </div>
+          <ul className="console__list">
+            {agent.directReports.map((r) => (
+              <li key={r.name} className="doc-row">
+                <Link to={`/explore/agents/${r.name}`} className="console__item-name">
+                  {r.name}
+                </Link>
+                {r.template && <span className="console__tag">{r.template}</span>}
+                {r.status && r.status !== "active" && (
+                  <span className="console__tag">{r.status}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="doc-group">
         <div className="console__panel-head">
