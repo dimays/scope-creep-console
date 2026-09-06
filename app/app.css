@@ -1104,3 +1104,108 @@ a.console__item-name:hover {
     transition: none;
   }
 }
+
+/* work-017 — the Propose surface: agent-drafted, isolated diff → gated PR.
+   Add/remove colors are a new diff semantic; a green isn't in the token set yet, so
+   the additive hue is a literal mixed over the surface (subtle in light and dark) and
+   deletions reuse --sc-danger. Keep these two the only diff literals. */
+.propose-result {
+  margin-top: 1.25rem;
+}
+.propose-summary {
+  margin: 0 0 0.6rem;
+  color: var(--sc-text);
+}
+.propose-stat {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  color: var(--sc-muted);
+}
+.propose-stat__add {
+  color: color-mix(in srgb, #2ea043 80%, var(--sc-text));
+  font-weight: 600;
+}
+.propose-stat__del {
+  color: var(--sc-danger);
+  font-weight: 600;
+}
+.propose-isolated {
+  color: color-mix(in srgb, #2ea043 70%, var(--sc-text));
+}
+.propose-isolated--warn {
+  color: var(--sc-warn);
+}
+.propose-discard {
+  background: transparent;
+  color: var(--sc-muted);
+  border: 1px solid var(--sc-border);
+}
+
+.diff {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.diff__file {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  overflow: hidden;
+}
+.diff__file-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--sc-bg);
+  border-bottom: 1px solid var(--sc-border);
+}
+.diff__status {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--sc-tag-bg);
+  color: var(--sc-accent);
+}
+.diff__status--added {
+  background: color-mix(in srgb, #2ea043 18%, transparent);
+  color: color-mix(in srgb, #2ea043 75%, var(--sc-text));
+}
+.diff__status--deleted {
+  background: color-mix(in srgb, var(--sc-danger) 16%, transparent);
+  color: var(--sc-danger);
+}
+.diff__path {
+  font-size: 0.82rem;
+  color: var(--sc-text);
+}
+.diff__body {
+  margin: 0;
+  padding: 0.5rem 0;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  background: var(--sc-surface);
+}
+.diff__line {
+  display: block;
+  padding: 0 0.7rem;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.diff__line--add {
+  background: color-mix(in srgb, #2ea043 12%, transparent);
+  color: color-mix(in srgb, #2ea043 45%, var(--sc-text));
+}
+.diff__line--del {
+  background: color-mix(in srgb, var(--sc-danger) 10%, transparent);
+  color: color-mix(in srgb, var(--sc-danger) 55%, var(--sc-text));
+}
+.diff__line--hunk {
+  color: var(--sc-muted);
+  background: var(--sc-bg);
+}
+.diff__line--context {
+  color: var(--sc-text);
+}

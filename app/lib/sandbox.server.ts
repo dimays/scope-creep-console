@@ -20,6 +20,20 @@ export type PreviewResult = { diff: string; liveClean: boolean };
 const exec = promisify(execFile);
 
 /**
+ * Path safety (the CRO gate), for a single repo-relative path: reject anything that
+ * could escape the repo or reach outside it. Pure + unit-tested. This is the one
+ * place both the edit-applier and the agent's `read_file` tool (work-017) ask "is
+ * this path safe to touch?", so the rule has a single source of truth.
+ */
+export function isSafeRelPath(p: unknown): boolean {
+  if (typeof p !== "string" || p.length === 0) return false;
+  if (p.startsWith("/") || /^[A-Za-z]:/.test(p)) return false; // absolute
+  if (p.split(/[\\/]/).includes("..")) return false; // parent escape
+  if (p.includes("\0")) return false; // null byte
+  return true;
+}
+
+/**
  * Path safety (the CRO gate): reject anything that could escape the repo. Pure +
  * unit-tested. Applied before any filesystem/git action.
  */

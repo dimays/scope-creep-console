@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { action as chatProposeAction } from "./chat-propose";
 import { loader as healthzLoader } from "./healthz";
+import { loader as proposeLoader } from "./propose";
 import { action as settingsAction, loader as settingsLoader } from "./settings";
 import { action as threadsAction, loader as threadsLoader } from "./threads";
 import { loader as requestsRedirect } from "./work-requests";
@@ -85,6 +87,42 @@ describe("route: /settings (work-018 model picker)", () => {
     expect(res.ok).toBe(true);
     const data = await settingsLoader({} as never);
     expect(data.effectiveSource).not.toBe("persisted");
+  });
+});
+
+describe("route: /propose (work-017 flagship)", () => {
+  it("loader reports key presence and the effective model", async () => {
+    const data = await proposeLoader({} as never);
+    // The test env sets ANTHROPIC_API_KEY to "" — the agent runs its offline fallback.
+    expect(data.hasKey).toBe(false);
+    expect(typeof data.model).toBe("string");
+    expect(data.model.length).toBeGreaterThan(0);
+  });
+});
+
+describe("route: /chat/propose (agent-generated proposals)", () => {
+  it("rejects an empty request", async () => {
+    const res = (await chatProposeAction({
+      request: new Request("http://localhost/chat/propose", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: "  " }),
+      }),
+    } as never)) as Response;
+    expect(res.status).toBe(400);
+  });
+
+  it("returns a clean no_key result offline — never auto-applies", async () => {
+    const res = (await chatProposeAction({
+      request: new Request("http://localhost/chat/propose", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: "Add a footer to the home page" }),
+      }),
+    } as never)) as Response;
+    const body = (await res.json()) as { ok: boolean; reason: string };
+    expect(body.ok).toBe(false);
+    expect(body.reason).toBe("no_key");
   });
 });
 
