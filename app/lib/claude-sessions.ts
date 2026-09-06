@@ -112,6 +112,8 @@ export function buildResumeCommand(sessionUuid: string): string {
 type SessionRecord = {
   type?: string;
   isSidechain?: boolean;
+  /** Claude Code marks its own injected (non-Owner) `user` records with this. */
+  isMeta?: boolean;
   timestamp?: string;
   message?: {
     role?: string;
@@ -138,6 +140,70 @@ export function stripMarker(text: string): string {
 }
 
 /**
+ * Content Claude Code injects into the transcript as `user`-type records even though the
+ * Owner never typed it: leading XML-ish tags Claude Code wraps around system/slash-command
+ * payloads. Matched by *leading* prefix so a genuine Owner message that merely mentions one
+ * of these mid-body is never nuked.
+ */
+const INJECTED_TAG_PREFIXES = [
+  "<system-reminder>",
+  "<command-name>",
+  "<command-message>",
+  "<command-args>",
+  "<local-command-stdout>",
+  "<local-command-stderr>",
+] as const;
+
+/** Interrupt notices Claude Code writes as `user` records — not the Owner's words. */
+const INTERRUPT_NOTICES = new Set([
+  "[Request interrupted by user]",
+  "[Request interrupted by user for tool use]",
+]);
+
+/**
+ * Is this text (a whole string content, or one text block) a system-injected, non-Owner
+ * payload? True when it *is* an interrupt notice, or *leads* with a system/slash-command
+ * wrapper. Keyed on leading/whole so a real Owner message that only *contains* such text
+ * mid-body survives.
+ */
+function isInjectedText(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (INTERRUPT_NOTICES.has(t)) return true;
+  return INJECTED_TAG_PREFIXES.some((p) => t.startsWith(p));
+}
+
+/**
+ * Extract genuine Owner text from a `user` record, or null if the record carries no Owner
+ * turn. Claude Code injects non-Owner content as `user` records (system-reminders like the
+ * working-directory notice, slash-command wrappers, interrupt notices, and `isMeta` records);
+ * those must not render as the Owner ("YOU"). We drop a whole record that is `isMeta` or whose
+ * (leading) content is injected, and inside a multi-block record we drop the injected blocks
+ * while keeping genuine Owner text. The returned text is raw (marker NOT stripped) so
+ * correlation still sees it; display callers strip the marker themselves.
+ */
+function ownerTextFromUserRecord(rec: SessionRecord): string | null {
+  if (rec.isMeta) return null;
+  const content = rec.message?.content;
+  if (typeof content === "string") {
+    if (isInjectedText(content)) return null;
+    return content.trim() ? content : null;
+  }
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const block of content as ContentBlock[]) {
+      if (block?.type !== "text" || typeof block.text !== "string") continue;
+      // tool_result blocks (non-text) are mechanical tool feedback — not an Owner turn.
+      if (isInjectedText(block.text)) continue; // drop an injected block, keep the rest
+      if (block.text.trim()) parts.push(block.text);
+    }
+    const joined = parts.join("\n");
+    return joined.trim() ? joined : null;
+  }
+  return null;
+}
+
+/**
  * Extract the first Owner (`user`) text from a session JSONL — the seed prompt of a
  * Claude Code session. Used for correlation (does it contain a thread's marker?). Skips
  * `tool_result`-only user records (mechanical tool feedback, not an Owner turn) and
@@ -158,19 +224,10 @@ export function firstOwnerText(jsonl: string): string | null {
     }
     if (rec.isSidechain) continue;
     if (rec.type !== "user") continue;
-    const content = rec.message?.content;
-    if (typeof content === "string") {
-      if (content.trim()) return content;
-      continue;
-    }
-    if (Array.isArray(content)) {
-      const text = (content as ContentBlock[])
-        .filter((b) => b?.type === "text" && typeof b.text === "string")
-        .map((b) => b.text as string)
-        .join("\n")
-        .trim();
-      if (text) return text;
-    }
+    // Skip system-injected `user` records (system-reminders, slash-command wrappers,
+    // interrupt notices, isMeta) so a leading injected record can't fool correlation.
+    const owner = ownerTextFromUserRecord(rec);
+    if (owner) return owner;
   }
   return null;
 }
@@ -208,18 +265,13 @@ export function parseTranscript(jsonl: string): ProjectedTurn[] {
     const at = parseTs(rec.timestamp);
 
     if (rec.type === "user") {
-      const content = rec.message?.content;
-      if (typeof content === "string") {
-        const text = stripMarker(content);
+      // Only genuine Owner text becomes an `owner` turn. System-injected `user` records
+      // (system-reminders like the working-directory notice, slash-command wrappers,
+      // interrupt notices, isMeta) are filtered out so they never render as the Owner.
+      const owner = ownerTextFromUserRecord(rec);
+      if (owner) {
+        const text = stripMarker(owner);
         if (text) turns.push({ role: "owner", text, at });
-      } else if (Array.isArray(content)) {
-        for (const block of content as ContentBlock[]) {
-          if (block?.type === "text" && typeof block.text === "string") {
-            const text = stripMarker(block.text);
-            if (text) turns.push({ role: "owner", text, at });
-          }
-          // tool_result blocks are mechanical tool feedback — not an Owner turn.
-        }
       }
       continue;
     }

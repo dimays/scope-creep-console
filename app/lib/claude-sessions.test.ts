@@ -16,6 +16,10 @@ import {
 } from "./claude-sessions";
 
 const FIXTURE = readFileSync(join(__dirname, "__fixtures__", "claude-session.jsonl"), "utf8");
+const INJECTED_FIXTURE = readFileSync(
+  join(__dirname, "__fixtures__", "injected-records.jsonl"),
+  "utf8",
+);
 
 describe("thread ↔ session correlation markers (work-046)", () => {
   it("threadMarker is compact and unique per thread", () => {
@@ -139,5 +143,58 @@ describe("transcript projection from local JSONL (work-047)", () => {
 
   it("stripMarker removes the marker and trims", () => {
     expect(stripMarker("hello\n\n[scope-creep-thread:42]")).toBe("hello");
+  });
+});
+
+describe("system-injected user records don't render as the Owner (Bug 1)", () => {
+  const turns = parseTranscript(INJECTED_FIXTURE);
+  const ownerTexts = turns.filter((t) => t.role === "owner").map((t) => t.text);
+
+  it("keeps genuine owner/agent turns, in order, and excludes every injected record", () => {
+    // Interleaved: isMeta system-reminder, owner, agent, string system-reminder, command
+    // wrapper, local-command-stdout, two interrupt notices, owner (mid-body mention), agent,
+    // owner. Only the three real owner + two agent turns survive, in order.
+    expect(turns.map((t) => t.role)).toEqual(["owner", "agent", "owner", "agent", "owner"]);
+  });
+
+  it("filters the working-directory system-reminder (verified live on thread 7) so it isn't YOU", () => {
+    const joined = JSON.stringify(turns);
+    expect(joined).not.toContain("working directory has changed");
+    expect(joined).not.toContain("Plan mode is active");
+  });
+
+  it("filters slash-command wrappers and their stdout", () => {
+    const joined = JSON.stringify(turns);
+    expect(joined).not.toContain("<command-name>");
+    expect(joined).not.toContain("/compact");
+    expect(joined).not.toContain("<local-command-stdout>");
+    expect(joined).not.toContain("compacted 40 messages");
+  });
+
+  it("filters both interrupt notices", () => {
+    const joined = JSON.stringify(turns);
+    expect(joined).not.toContain("[Request interrupted by user]");
+    expect(joined).not.toContain("[Request interrupted by user for tool use]");
+  });
+
+  it("keeps a real owner message that only MENTIONS an injected tag mid-body", () => {
+    expect(ownerTexts).toContain("Please explain what a <system-reminder> block is.");
+  });
+
+  it("keeps genuine owner text (marker stripped) in the right order", () => {
+    expect(ownerTexts).toEqual([
+      "Kick off the crank.",
+      "Please explain what a <system-reminder> block is.",
+      "Thanks, wrap it up.",
+    ]);
+  });
+
+  it("firstOwnerText skips a leading injected record and returns the real seed (marker intact)", () => {
+    const first = firstOwnerText(INJECTED_FIXTURE);
+    // The leading isMeta system-reminder must not fool correlation.
+    expect(first).not.toContain("working directory has changed");
+    expect(first).toContain("Kick off the crank.");
+    expect(first).toContain("[scope-creep-thread:9]");
+    expect(sessionMatchesMarker(INJECTED_FIXTURE, threadMarker(9))).toBe(true);
   });
 });
