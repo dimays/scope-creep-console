@@ -52,7 +52,7 @@ export default function Threads({ loaderData }: Route.ComponentProps) {
           <h1 className="console__title">Threads</h1>
         </div>
         <div className="threads-header-meta">
-          <p className="console__meta">one conversation with your Chief of Staff · work-029</p>
+          <p className="console__meta">Conversations with your Chief of Staff</p>
           <Link to="/threads/archive" className="threads-archive-link">
             Archive{archivedCount > 0 ? ` (${archivedCount})` : ""} →
           </Link>

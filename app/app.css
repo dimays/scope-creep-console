@@ -125,25 +125,52 @@ body {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
+/* A panel row: [optional dot] name … [optional tag]. Left-aligned so a row without a
+   trailing tag (e.g. a bare thread title) never gets stretched/pushed to the right edge
+   — that inconsistency was the "some rows left, some right" bug. The tag, when present,
+   is pushed to the right by its own margin (below). */
 .console__item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .console__item-name {
   font-weight: 500;
+  min-width: 0;
 }
 
 .console__tag {
+  /* Pinned to the right of the row, kept on one line so counts like "1 report" never
+     break across two lines when the name is long. */
+  margin-left: auto;
+  flex: none;
+  white-space: nowrap;
   font-size: 0.72rem;
   color: var(--sc-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* Two labeled lists (Apps / Extensions) inside one card; the second gets a quiet divider. */
+.console__subgroup + .console__subgroup {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--sc-border);
+}
+
+.console__subtitle {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sc-muted);
 }
 
 .console__empty {
