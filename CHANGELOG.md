@@ -6,11 +6,13 @@
   `requests`/`request_messages` tables are migrated into `conversations`/
   `conversation_messages` and retired (data-preserving migration `0001`). A thread now
   carries an explicit **lifecycle/turn** (`open → needs-you | working → closed`) — the
-  native fix for the work-011 "whose turn" bug — and renders intake **outcomes** inline
-  as typed cards. The Human-Input Log now reads a single consolidated owner-message
-  source. Old `/chat` and `/work/requests[/:id]` redirect to `/threads`; the live agent
-  chat is the `chat`-kind thread. Triage stays async in the operator session (no new
-  runtime).
+  native fix for the work-011 "whose turn" bug, surfaced on the list as a single **status
+  dot** (orange = waiting on you) — and renders intake **outcomes** inline as typed cards
+  that deep-link to their artifact. The Console home gains a **Threads** card. The Human-
+  Input Log now reads a single consolidated owner-message source. Old `/chat` and
+  `/work/requests[/:id]` redirect to `/threads`. Every thread is a Chief-of-Staff
+  conversation (the old pinned "Console chat" is gone); triage stays async in the operator
+  session — live in-app replies land in a later phase on the flagship runtime.
 
 ## 0.15.0 — 2026-09-05
 - **Human-Input Log — expand to full message** (work-021, PR #14): a truncated entry is

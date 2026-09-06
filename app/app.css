@@ -623,10 +623,55 @@ a.console__item-name:hover {
   color: var(--sc-muted);
 }
 
-.thread-row__meta {
-  display: inline-flex;
-  gap: 0.4rem;
+/* thread list row: [status dot] title … [kind tag] */
+.thread-row {
+  display: flex;
   align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--sc-border);
+}
+
+.thread-row__title {
+  flex: 1;
+}
+
+/* A single status dot. Orange = the thread is waiting on you (needs-you). */
+.thread-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--sc-border);
+}
+
+.thread-dot--needs-you {
+  background: #e8833a;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #e8833a 22%, transparent);
+}
+
+.thread-dot--working {
+  background: #3aa76d;
+}
+
+.thread-dot--closed {
+  background: var(--sc-border);
+}
+
+.thread-dot--open {
+  background: var(--sc-muted);
+}
+
+.console__panel-link {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--sc-accent);
+  text-decoration: none;
+}
+
+.console__panel-link:hover {
+  text-decoration: underline;
 }
 
 .console__backlink {

@@ -1,5 +1,4 @@
 import { Form, Link } from "react-router";
-import { ChatMount } from "~/components/chat-mount";
 import { parseMeta, type ThreadMessage, type ThreadStatus } from "~/lib/threads";
 import { addMessage, getThread } from "~/lib/threads.server";
 import type { Route } from "./+types/thread";
@@ -48,7 +47,6 @@ function authorLabel(msg: ThreadMessage): string {
 export default function Thread({ loaderData }: Route.ComponentProps) {
   const { thread, messages } = loaderData;
   const status = thread.status as ThreadStatus;
-  const isChat = thread.kind === "chat";
 
   return (
     <main className="console">
@@ -60,53 +58,38 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
             </Link>{" "}
             · {thread.kind}
           </p>
-          <h1 className="console__title">{thread.title || "Console chat"}</h1>
+          <h1 className="console__title">{thread.title || "Untitled thread"}</h1>
         </div>
         <span className={`tag thread-status--${status}`}>{TURN[status] ?? status}</span>
       </header>
 
-      {isChat ? (
-        // The live agent-chat thread (work-014 runtime); ChatMount posts to /chat/send.
-        <ChatMount initialMessages={messages.map((m) => ({ role: m.role, body: m.body }))} />
-      ) : (
-        <>
-          <div className="thread">
-            {messages.map((msg) =>
-              msg.type === "outcome" ? (
-                <OutcomeCard key={msg.id} msg={msg} />
-              ) : (
-                <div
-                  key={msg.id}
-                  className={`msg msg--${msg.role === "owner" ? "owner" : "agent"}`}
-                >
-                  <span className="msg__author">{authorLabel(msg)}</span>
-                  <p className="msg__body">{msg.body}</p>
-                </div>
-              ),
-            )}
-          </div>
-
-          {status === "closed" ? (
-            <p className="console__notice">
-              This thread is closed. Reply to reopen it and hand the turn back to the org.
-            </p>
-          ) : null}
-
-          <Form method="post" className="req-form">
-            <textarea
-              name="body"
-              className="req-textarea"
-              placeholder="Add to the thread…"
-              required
-            />
-            <div className="req-actions">
-              <button type="submit" className="req-submit">
-                Reply
-              </button>
+      <div className="thread">
+        {messages.map((msg) =>
+          msg.type === "outcome" ? (
+            <OutcomeCard key={msg.id} msg={msg} />
+          ) : (
+            <div key={msg.id} className={`msg msg--${msg.role === "owner" ? "owner" : "agent"}`}>
+              <span className="msg__author">{authorLabel(msg)}</span>
+              <p className="msg__body">{msg.body}</p>
             </div>
-          </Form>
-        </>
-      )}
+          ),
+        )}
+      </div>
+
+      {status === "closed" ? (
+        <p className="console__notice">
+          This thread is closed. Reply to reopen it and hand the turn back to the org.
+        </p>
+      ) : null}
+
+      <Form method="post" className="req-form">
+        <textarea name="body" className="req-textarea" placeholder="Add to the thread…" required />
+        <div className="req-actions">
+          <button type="submit" className="req-submit">
+            Reply
+          </button>
+        </div>
+      </Form>
     </main>
   );
 }

@@ -1,5 +1,4 @@
 import { Form, Link, redirect } from "react-router";
-import { getOrCreateConversation } from "~/lib/conversation.server";
 import type { ThreadStatus } from "~/lib/threads";
 import { createThread, listThreads } from "~/lib/threads.server";
 import type { Route } from "./+types/threads";
@@ -17,8 +16,6 @@ const TURN: Record<ThreadStatus, string> = {
 };
 
 export async function loader(_: Route.LoaderArgs) {
-  // Make sure the live agent-chat thread always exists so it shows in the list.
-  await getOrCreateConversation("chat", "Console chat");
   return { threads: await listThreads() };
 }
 
@@ -65,20 +62,25 @@ export default function Threads({ loaderData }: Route.ComponentProps) {
       <section className="doc-group">
         <h2 className="doc-group__title">All threads</h2>
         {threads.length === 0 ? (
-          <p className="console__empty">No threads yet.</p>
+          <p className="console__empty">No threads yet — start one above.</p>
         ) : (
           <ul className="console__list">
             {threads.map((t) => {
               const status = t.status as ThreadStatus;
+              const turn = TURN[status] ?? status;
               return (
-                <li key={t.id} className="doc-row">
-                  <Link to={`/threads/${t.id}`} className="console__item-name">
-                    {t.title || (t.kind === "chat" ? "Console chat" : "Untitled thread")}
+                <li key={t.id} className="thread-row">
+                  {/* A single status dot — orange means the thread is waiting on you. */}
+                  <span
+                    className={`thread-dot thread-dot--${status}`}
+                    role="img"
+                    title={turn}
+                    aria-label={turn}
+                  />
+                  <Link to={`/threads/${t.id}`} className="console__item-name thread-row__title">
+                    {t.title || "Untitled thread"}
                   </Link>
-                  <span className="thread-row__meta">
-                    <span className="tag">{t.kind}</span>
-                    <span className={`tag thread-status--${status}`}>{TURN[status] ?? status}</span>
-                  </span>
+                  <span className="tag">{t.kind}</span>
                 </li>
               );
             })}

@@ -2,6 +2,8 @@ import { Link } from "react-router";
 import { db, ensureSchema } from "~/db";
 import { pageVisits } from "~/db/schema";
 import { readRegistry } from "~/lib/registry.server";
+import type { ThreadStatus } from "~/lib/threads";
+import { listThreads } from "~/lib/threads.server";
 import { APP_VERSION } from "~/lib/version";
 import type { Route } from "./+types/home";
 
@@ -17,11 +19,25 @@ export async function loader({ request }: Route.LoaderArgs) {
   await db.insert(pageVisits).values({ path: new URL(request.url).pathname, at: Date.now() });
   const visits = await db.select().from(pageVisits);
   const registry = await readRegistry();
-  return { registry, visitCount: visits.length, version: APP_VERSION };
+  // Threads card: newest-updated first, with "waiting on you" surfaced to the top.
+  const all = await listThreads();
+  const threads = all
+    .map((t) => ({ id: t.id, title: t.title, status: t.status as ThreadStatus }))
+    .sort((a, b) => Number(b.status === "needs-you") - Number(a.status === "needs-you"))
+    .slice(0, 5);
+  const needsYou = all.filter((t) => t.status === "needs-you").length;
+  return {
+    registry,
+    visitCount: visits.length,
+    version: APP_VERSION,
+    threads,
+    threadCount: all.length,
+    needsYou,
+  };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { registry, visitCount, version } = loaderData;
+  const { registry, visitCount, version, threads, threadCount, needsYou } = loaderData;
 
   return (
     <main className="console">
@@ -43,6 +59,26 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       )}
 
       <section className="console__grid">
+        <Panel title="Threads" count={threadCount}>
+          <Link to="/threads" className="console__panel-link">
+            {needsYou > 0 ? `${needsYou} waiting on you →` : "Open Threads →"}
+          </Link>
+          {threads.length === 0 ? (
+            <p className="console__empty">No threads yet.</p>
+          ) : (
+            <ul className="console__list">
+              {threads.map((t) => (
+                <li key={t.id} className="console__item">
+                  <span className={`thread-dot thread-dot--${t.status}`} aria-hidden="true" />
+                  <Link to={`/threads/${t.id}`} className="console__item-name">
+                    {t.title || "Untitled thread"}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
         <Panel title="Agents" count={registry.agents.length}>
           <ul className="console__list">
             {registry.agents.map((agent) => (

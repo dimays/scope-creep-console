@@ -19,11 +19,9 @@ describe("route: /healthz", () => {
 });
 
 describe("route: /threads (work-029, ADR-012)", () => {
-  it("loader returns the threads list (and ensures the chat thread exists)", async () => {
+  it("loader returns the threads list", async () => {
     const data = await threadsLoader({} as never);
     expect(Array.isArray(data.threads)).toBe(true);
-    // getOrCreateConversation('chat', …) in the loader guarantees at least the chat thread.
-    expect(data.threads.some((t) => t.kind === "chat")).toBe(true);
   });
 
   it("action rejects empty input", async () => {
