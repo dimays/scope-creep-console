@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.22.0 — 2026-09-06
+- **Remove the now-dead `agentRespondStream`** (follow-up to 0.21.0 / #33): 0.21.0 removed
+  `threadReplyStream`, the last Threads-reachable caller of `agentRespondStream`, but left the
+  streaming variant exported in `agent.server.ts` rather than reshape that module in the same PR.
+  With no callers left anywhere, it's deleted here. Verified dead before removal: the
+  `@scope-creep/ext-chatbot` extension is a **client-side UI mount** (`mountChat`) that makes no
+  Claude calls of its own, and the console's `chat/send` route uses the **non-streaming**
+  `agentRespond` via `conversation.server`. Every helper the stream shared (`fallbackReply`,
+  `anthropicHeaders`, `MODEL`, `toAnthropicMessages`, `noteRateLimit`, `SYSTEM_PROMPT`) stays in
+  use by `agentRespond`, so nothing else becomes dead. **No behavior change**; `agent.server.ts`'s
+  `agentRespond` / `toAnthropicMessages` (conversation/propose paths + the chatbot extension's
+  own API-keyed, ToS-clean build-tool path, ADR-016) are untouched.
+
 ## 0.21.0 — 2026-09-06
 - **Finish the ADR-016 demotion of the in-app Threads chat runtime** (follow-up to work-046 +
   work-047): the launcher + local-JSONL transcript projection (#32) replaced the in-app
