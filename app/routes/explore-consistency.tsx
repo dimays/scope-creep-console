@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { ExploreNav } from "~/components/explore-nav";
 import { consistency } from "~/lib/explore.server";
+import { inputConsistency } from "~/lib/human-input.server";
 import type { Route } from "./+types/explore-consistency";
 
 export function meta(_: Route.MetaArgs) {
@@ -8,13 +9,18 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader(_: Route.LoaderArgs) {
-  return { report: await consistency() };
+  return { report: await consistency(), inputChecks: await inputConsistency() };
+}
+
+/** Deterministic UTC (avoids SSR/client hydration mismatch), matching /work/inputs. */
+function fmt(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 16).replace("T", " ");
 }
 
 type Item = { key: string; label: string; to?: string };
 
 export default function Consistency({ loaderData }: Route.ComponentProps) {
-  const { report } = loaderData;
+  const { report, inputChecks } = loaderData;
   return (
     <main className="console">
       <header className="console__header">
@@ -25,7 +31,38 @@ export default function Consistency({ loaderData }: Route.ComponentProps) {
       </header>
       <ExploreNav />
 
-      {report.ok && <p className="console__notice">Everything checks out — nothing out of sync.</p>}
+      {report.ok && inputChecks.ok && (
+        <p className="console__notice">Everything checks out — nothing out of sync.</p>
+      )}
+
+      {/* Human-Input Log self-checks (work-022): does the record match reality? */}
+      {!inputChecks.hasData && (
+        <p className="console__notice console__notice--error">
+          Human-input consistency: no inputs and no control-plane commits to compare — can't verify
+          (this is not the same as "clean").
+        </p>
+      )}
+      <Section
+        title="Input gaps (control-plane work with no captured input)"
+        hint="Commits/merges that no recorded human input accounts for — a missed input or an uninstalled/misfiring capture hook."
+        empty="Every observed commit is preceded by a captured input."
+        items={inputChecks.gaps.map((gap, i) => ({
+          key: `gap-${gap.fromTs}-${i}`,
+          label: `${gap.count} commit(s) with no preceding input — ${fmt(gap.fromTs)} to ${fmt(gap.toTs)} (e.g. "${gap.commits[0]}")`,
+        }))}
+      />
+      <Section
+        title="Duplicate inputs"
+        hint="The same input recorded twice — a duplicate id, or a duplicate (timestamp, text) pair (e.g. a backfill overlapping a live capture)."
+        empty="No duplicate inputs."
+        items={inputChecks.dups.map((dup, i) => ({
+          key: `dup-${dup.kind}-${i}`,
+          label:
+            dup.kind === "id"
+              ? `duplicate id "${dup.key}" — ${dup.count}×`
+              : `duplicate (ts, text) — ${dup.count}× (ids: ${dup.ids.join(", ")})`,
+        }))}
+      />
 
       <Section
         title="Version skew (version.ts ↔ package.json ↔ CHANGELOG)"
