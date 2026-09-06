@@ -3,6 +3,7 @@ import { NavLink } from "react-router";
 const LINKS = [
   { to: "/explore", label: "Overview", end: true },
   { to: "/explore/docs", label: "Docs", end: false },
+  { to: "/explore/loops", label: "Loops", end: false },
   { to: "/explore/timeline", label: "Timeline", end: false },
   { to: "/explore/consistency", label: "Consistency", end: false },
 ];

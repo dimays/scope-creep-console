@@ -3,7 +3,7 @@ import { ExploreNav } from "~/components/explore-nav";
 import { FeedbackMount } from "~/components/feedback-mount";
 import { db, ensureSchema } from "~/db";
 import { feedback } from "~/db/schema";
-import { consistency, listDocs, listLedger } from "~/lib/explore.server";
+import { consistency, listDocs, listLedger, listLoops } from "~/lib/explore.server";
 import { readRegistry } from "~/lib/registry.server";
 import type { Route } from "./+types/explore";
 
@@ -13,15 +13,21 @@ export function meta(_: Route.MetaArgs) {
 
 export async function loader(_: Route.LoaderArgs) {
   await ensureSchema();
-  const [docs, ledger, registry, report, feedbackRows] = await Promise.all([
+  const [docs, ledger, loops, registry, report, feedbackRows] = await Promise.all([
     listDocs(),
     listLedger(),
+    listLoops(),
     readRegistry(),
     consistency(),
     db.select().from(feedback),
   ]);
   return {
-    counts: { docs: docs.length, agents: registry.agents.length, ledger: ledger.length },
+    counts: {
+      docs: docs.length,
+      agents: registry.agents.length,
+      loops: loops.length,
+      ledger: ledger.length,
+    },
     issues:
       report.danglingLinks.length +
       report.proposedDocs.length +
@@ -46,6 +52,9 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
       <section className="console__grid">
         <ExploreCard to="/explore/docs" title="Docs" count={counts.docs}>
           Charter, standards, ADRs, product specs, and loops.
+        </ExploreCard>
+        <ExploreCard to="/explore/loops" title="Loops" count={counts.loops}>
+          The governed procedures the org runs, linked to their owners.
         </ExploreCard>
         <ExploreCard to="/explore/timeline" title="Timeline" count={counts.ledger}>
           Every recorded decision and event, newest first.
