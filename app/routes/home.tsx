@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { db, ensureSchema } from "~/db";
 import { pageVisits } from "~/db/schema";
 import { readRegistry } from "~/lib/registry.server";
-import type { ThreadStatus } from "~/lib/threads";
+import { needsYouThreads, type ThreadStatus } from "~/lib/threads";
 import { listThreads } from "~/lib/threads.server";
 import { APP_VERSION } from "~/lib/version";
 import type { Route } from "./+types/home";
@@ -25,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     .map((t) => ({ id: t.id, title: t.title, status: t.status as ThreadStatus }))
     .sort((a, b) => Number(b.status === "needs-you") - Number(a.status === "needs-you"))
     .slice(0, 5);
-  const needsYou = all.filter((t) => t.status === "needs-you").length;
+  const needsYou = needsYouThreads(all).length;
   return {
     registry,
     visitCount: visits.length,

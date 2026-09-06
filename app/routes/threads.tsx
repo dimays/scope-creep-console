@@ -1,6 +1,6 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { SubmitButton } from "~/components/state";
-import type { ThreadStatus } from "~/lib/threads";
+import { groupThreads, type Thread, type ThreadInitiator, type ThreadStatus } from "~/lib/threads";
 import { createThread, listThreads } from "~/lib/threads.server";
 import type { Route } from "./+types/threads";
 
@@ -37,6 +37,9 @@ export default function Threads({ loaderData }: Route.ComponentProps) {
   const { threads } = loaderData;
   const nav = useNavigation();
   const opening = nav.state !== "idle" && nav.formMethod === "POST";
+  // One derivation, shared with the home badge: threads parked on the Owner surface first.
+  const { needsYou, active, closed } = groupThreads(threads);
+
   return (
     <main className="console">
       <header className="console__header">
@@ -69,34 +72,83 @@ export default function Threads({ loaderData }: Route.ComponentProps) {
         </div>
       </Form>
 
-      <section className="doc-group">
-        <h2 className="doc-group__title">All threads</h2>
-        {threads.length === 0 ? (
+      {threads.length === 0 ? (
+        <section className="doc-group">
+          <h2 className="doc-group__title">All threads</h2>
           <p className="console__empty">No threads yet — start one above.</p>
-        ) : (
-          <ul className="console__list">
-            {threads.map((t) => {
-              const status = t.status as ThreadStatus;
-              const turn = TURN[status] ?? status;
-              return (
-                <li key={t.id} className="thread-row">
-                  {/* A single status dot — orange means the thread is waiting on you. */}
-                  <span
-                    className={`thread-dot thread-dot--${status}`}
-                    role="img"
-                    title={turn}
-                    aria-label={turn}
-                  />
-                  <Link to={`/threads/${t.id}`} className="console__item-name thread-row__title">
-                    {t.title || "Untitled thread"}
-                  </Link>
-                  <span className="tag">{t.kind}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+        </section>
+      ) : (
+        <>
+          {/* The "needs-you" queue (work-030): threads parked on you, distinct from working/closed. */}
+          <ThreadSection
+            title="Waiting on you"
+            count={needsYou.length}
+            threads={needsYou}
+            emphasis
+            empty="Nothing is waiting on you right now."
+          />
+          <ThreadSection title="Active" count={active.length} threads={active} />
+          {closed.length > 0 ? (
+            <ThreadSection title="Closed" count={closed.length} threads={closed} />
+          ) : null}
+        </>
+      )}
     </main>
+  );
+}
+
+function ThreadSection({
+  title,
+  count,
+  threads,
+  emphasis = false,
+  empty,
+}: {
+  title: string;
+  count: number;
+  threads: Thread[];
+  emphasis?: boolean;
+  empty?: string;
+}) {
+  return (
+    <section className={emphasis ? "doc-group thread-queue" : "doc-group"}>
+      <h2 className="doc-group__title">
+        {title} <span className="console__count">{count}</span>
+      </h2>
+      {threads.length === 0 ? (
+        empty ? (
+          <p className="console__empty">{empty}</p>
+        ) : null
+      ) : (
+        <ul className="console__list">
+          {threads.map((t) => (
+            <ThreadRow key={t.id} thread={t} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ThreadRow({ thread }: { thread: Thread }) {
+  const status = thread.status as ThreadStatus;
+  const turn = TURN[status] ?? status;
+  const orgInitiated = (thread.initiator as ThreadInitiator) === "org";
+  return (
+    <li className="thread-row">
+      {/* A single status dot — orange means the thread is waiting on you. */}
+      <span
+        className={`thread-dot thread-dot--${status}`}
+        role="img"
+        title={turn}
+        aria-label={turn}
+      />
+      <Link to={`/threads/${thread.id}`} className="console__item-name thread-row__title">
+        {thread.title || "Untitled thread"}
+      </Link>
+      {/* The org started this one — the CoS opened it to get your input (work-030). */}
+      {orgInitiated ? <span className="tag thread-row__initiator">CoS opened</span> : null}
+      <span className="tag">{thread.kind}</span>
+    </li>
   );
 }

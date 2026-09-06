@@ -641,6 +641,17 @@ a.console__item-name:hover {
   flex: 1;
 }
 
+/* The org opened this thread (work-030) — a warm marker so the CoS voice is legible. */
+.thread-row__initiator {
+  background: color-mix(in srgb, #e8833a 16%, transparent);
+  color: #e8833a;
+}
+
+/* The "needs-you" queue section — a warm rule so the Owner's turn stands apart. */
+.thread-queue .doc-group__title {
+  color: #e8833a;
+}
+
 /* A single status dot. Orange = the thread is waiting on you (needs-you). */
 .thread-dot {
   flex: none;
@@ -1008,6 +1019,12 @@ a.console__item-name:hover {
 
 .thread-working {
   border-left-color: #3aa76d;
+}
+
+/* The thread is parked on you (needs-you) — warm accent, matching the status dot. */
+.thread-needs-you {
+  border-left-color: #e8833a;
+  color: var(--sc-text, inherit);
 }
 
 /* App-wide interrupted / token-limit banner. */

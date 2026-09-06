@@ -14,7 +14,13 @@ import type { MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads
  * client-safe ./threads module.
  */
 
-export type { MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
+export type {
+  MessageMeta,
+  Thread,
+  ThreadInitiator,
+  ThreadMessage,
+  ThreadStatus,
+} from "./threads";
 
 /** All threads, most-recently-updated first (both `chat` and `request` kinds). */
 export async function listThreads(): Promise<Thread[]> {
@@ -42,12 +48,74 @@ export async function createThread(title: string, body: string, kind = "request"
   const now = Date.now();
   const [row] = await db
     .insert(conversations)
-    .values({ kind, title, status: "working", createdAt: now, updatedAt: now })
+    .values({ kind, title, status: "working", initiator: "owner", createdAt: now, updatedAt: now })
     .returning();
   await db
     .insert(conversationMessages)
     .values({ conversationId: row.id, role: "owner", type: "message", body, at: now });
   return row;
+}
+
+type OrgThreadOpts = {
+  /** Author label for the opener card (default `chief-of-staff`). */
+  author?: string;
+  kind?: string;
+  /** Override the starting turn; defaults to `needs-you` (parked on the Owner). */
+  status?: ThreadStatus;
+};
+
+/**
+ * The Chief of Staff opens a thread when the org needs the Owner's input (work-030) —
+ * giving the org a voice, not only the Owner. It's `initiator: "org"` and parked on the
+ * Owner (`needs-you`) from the start, so it lands in his needs-you queue. The opener is an
+ * `agent` message, so a CoS-initiated thread is an org→Owner event that never pollutes the
+ * Human-Input Log (which unions only `role = owner`). Built on the existing conversation
+ * primitive — no reshape.
+ */
+export async function createOrgThread(
+  title: string,
+  body: string,
+  opts: OrgThreadOpts = {},
+): Promise<Thread> {
+  await ensureSchema();
+  const now = Date.now();
+  const [row] = await db
+    .insert(conversations)
+    .values({
+      kind: opts.kind ?? "request",
+      title,
+      status: opts.status ?? "needs-you",
+      initiator: "org",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  await db.insert(conversationMessages).values({
+    conversationId: row.id,
+    role: "agent",
+    type: "message",
+    body,
+    meta: JSON.stringify({ author: opts.author ?? "chief-of-staff" }),
+    at: now,
+  });
+  return row;
+}
+
+/**
+ * The Chief of Staff posts a followup on an existing thread and hands the turn back to the
+ * Owner (`needs-you` by default) — the other half of a CoS voice (work-030). A closed
+ * thread is thereby reopened onto the Owner's queue. Delegates to `addMessage` so the
+ * turn-flip and `updatedAt` touch stay in one place.
+ */
+export async function orgFollowup(
+  threadId: number,
+  body: string,
+  opts: { author?: string; status?: ThreadStatus } = {},
+): Promise<void> {
+  await addMessage(threadId, "agent", body, {
+    status: opts.status ?? "needs-you",
+    meta: { author: opts.author ?? "chief-of-staff" },
+  });
 }
 
 type AddOpts = {

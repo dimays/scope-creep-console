@@ -5,8 +5,45 @@ import type { Conversation, ConversationMessage } from "~/db/schema";
 
 /** A thread's lifecycle/turn: `open → (needs-you | working) → closed`. */
 export type ThreadStatus = "open" | "needs-you" | "working" | "closed";
+/** Who opened a thread: the Owner, or the `org` (a CoS-initiated thread — work-030). */
+export type ThreadInitiator = "owner" | "org";
 export type Thread = Conversation;
 export type ThreadMessage = ConversationMessage;
+
+/**
+ * The Owner's "needs-you" queue (work-030): threads parked on him, awaiting his turn.
+ * Pure derivation over the stored `needs-you` state so the home badge and the Threads
+ * surface read from one source of truth.
+ */
+export function needsYouThreads(threads: Thread[]): Thread[] {
+  return threads.filter((t) => (t.status as ThreadStatus) === "needs-you");
+}
+
+export type ThreadGroups = {
+  /** Parked on the Owner — his turn. The "needs-you" queue. */
+  needsYou: Thread[];
+  /** The org is acting (`working`) or a thread is freshly `open`. */
+  active: Thread[];
+  /** Terminal — `closed` (reopenable by a followup). */
+  closed: Thread[];
+};
+
+/**
+ * Partition threads into the needs-you queue, active, and closed — each newest-updated
+ * first — so the Threads surface can show "waiting on you" distinctly from working/closed
+ * (work-030 acceptance). A thread is in exactly one group.
+ */
+export function groupThreads(threads: Thread[]): ThreadGroups {
+  const byRecent = [...threads].sort((a, b) => b.updatedAt - a.updatedAt);
+  const groups: ThreadGroups = { needsYou: [], active: [], closed: [] };
+  for (const t of byRecent) {
+    const status = t.status as ThreadStatus;
+    if (status === "needs-you") groups.needsYou.push(t);
+    else if (status === "closed") groups.closed.push(t);
+    else groups.active.push(t); // `working` | `open`
+  }
+  return groups;
+}
 
 /** Optional typed-card payload carried in `conversation_messages.meta` (JSON). */
 export type MessageMeta = {
