@@ -4,10 +4,23 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations, feedback } from "~/db/schema";
-import { type HumanInputEvent, type SpineItem, truncate } from "./human-input";
+import {
+  type CommitRecord,
+  type ConsistencyChecks,
+  type ConsistencyInput,
+  checkInputConsistency,
+  type HumanInputEvent,
+  type SpineItem,
+  truncate,
+} from "./human-input";
 
 export type {
+  CommitRecord,
+  ConsistencyChecks,
+  ConsistencyInput,
   HumanInputEvent,
+  InputDup,
+  InputGap,
   InputIntent,
   InputSource,
   Interlude,
@@ -161,6 +174,83 @@ export async function commitsBetween(fromTs: number, toTs: number): Promise<stri
   } catch {
     return [];
   }
+}
+
+// Control-plane commit record separator: git's %x1f emits the ASCII unit-separator
+// byte, which never appears in a commit subject, so a subject with pipes/spaces stays
+// intact when we split.
+const FIELD_SEP = "\x1f";
+
+/**
+ * Real control-plane commits with their commit timestamps, newest-first, for the
+ * consistency gap check (work-022). Unlike {@link commitsBetween}, this **includes
+ * merges** — a merge is a real control-plane event that shipped work, so a window of
+ * merges with no captured input is exactly the drift we want to catch. Reads live from
+ * SCOPE_CREEP_HOME via `git log`; grounded in the actual record, never synthesized.
+ * Best-effort: a non-repo home or a git failure yields [] (the caller then reports
+ * "no data / can't verify", not a false all-clear).
+ *
+ * @param sinceTs optional lower bound (ms) — commits at/after it. Omit to read all.
+ */
+export async function commitsWithTimestamps(sinceTs?: number): Promise<CommitRecord[]> {
+  const args = [
+    "-C",
+    controlPlaneHome(),
+    "log",
+    // %ct = committer date (unix seconds), %P = parent hashes (>1 ⇒ merge), %s = subject.
+    `--format=%ct${FIELD_SEP}%P${FIELD_SEP}%s`,
+  ];
+  if (sinceTs !== undefined) args.push(`--since=${new Date(sinceTs).toISOString()}`);
+  try {
+    const { stdout } = await exec("git", args, { maxBuffer: 8 * 1024 * 1024 });
+    const commits: CommitRecord[] = [];
+    for (const line of stdout.split("\n")) {
+      if (!line.trim()) continue;
+      const [ct, parents, subject] = line.split(FIELD_SEP);
+      const seconds = Number(ct);
+      if (!Number.isFinite(seconds)) continue;
+      commits.push({
+        ts: seconds * 1000,
+        subject: (subject ?? "").trim(),
+        merge: (parents ?? "").trim().split(/\s+/).filter(Boolean).length > 1,
+      });
+    }
+    return commits;
+  } catch {
+    return [];
+  }
+}
+
+// How far back to look for orphaned control-plane work when NO input has been captured
+// at all — the "hook never installed / stopped capturing" case. With captured inputs
+// present we anchor the window at the earliest one instead (see inputConsistency).
+const NO_INPUT_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * The grounded consistency self-check (work-022, ADR-010): read the real captured inputs
+ * and the real control-plane commits, then run the pure {@link checkInputConsistency}.
+ *
+ * Observation window (honest, low-noise):
+ *  - With captured inputs, we observe control-plane commits from the **earliest** input
+ *    onward. Ordinary work *between* inputs is an interlude, not a gap; the gap we flag is
+ *    control-plane work with no captured input preceding it at all.
+ *  - With **no** captured input, we look back {@link NO_INPUT_LOOKBACK_MS}: any commit in
+ *    that window is orphaned work the log can't account for — the strongest drift signal
+ *    (an uninstalled/misfiring capture hook). If there's neither input nor commit, the
+ *    check reports `hasData:false` ("can't verify"), never a false all-clear.
+ */
+export async function inputConsistency(): Promise<ConsistencyChecks> {
+  const events = await listHumanInput();
+  const earliestInputTs = events.length > 0 ? Math.min(...events.map((e) => e.ts)) : undefined;
+  const sinceTs = earliestInputTs ?? Date.now() - NO_INPUT_LOOKBACK_MS;
+  const commits = await commitsWithTimestamps(sinceTs);
+  const inputs: ConsistencyInput[] = events.map(({ id, ts, summary, excerpt }) => ({
+    id,
+    ts,
+    summary,
+    excerpt,
+  }));
+  return checkInputConsistency(inputs, commits);
 }
 
 /** The spine: inputs (newest-first) with interludes derived between consecutive ones. */
