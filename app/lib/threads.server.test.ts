@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { parseMeta } from "./threads";
 import {
+  addGeneratedRequest,
   addMessage,
+  branchThread,
   createOrgThread,
   createThread,
   getThread,
@@ -71,6 +73,109 @@ describe("CoS-initiated threads (work-030)", () => {
 
     const loaded = await getThread(row.id);
     expect(loaded?.thread.status).toBe("needs-you");
+  });
+});
+
+describe("thread branching (work-032)", () => {
+  it("branchThread links parent↔child both ways from a point in the parent", async () => {
+    const parent = await createThread("Roadmap", "Let's talk Q4 priorities.");
+    await addMessage(parent.id, "agent", "Here are three themes.", {
+      status: "needs-you",
+      meta: { author: "chief-of-staff" },
+    });
+    const loadedParent = await getThread(parent.id);
+    const splitPoint = loadedParent?.messages.at(-1)?.id ?? null;
+
+    const child = await branchThread({
+      parentId: parent.id,
+      title: "Theme 2 as its own effort",
+      body: "Theme 2 deserves its own thread — let's scope it.",
+      fromMessageId: splitPoint,
+    });
+
+    // Reverse link (child→parent) + the recorded split point.
+    expect(child.parentId).toBe(parent.id);
+    expect(child.branchedFromMessageId).toBe(splitPoint);
+    expect(child.status).toBe("working"); // the Owner's tangent → the org's turn
+
+    // The child is seeded with the Owner's tangent and knows its parent.
+    const loadedChild = await getThread(child.id);
+    expect(loadedChild?.parent).toEqual({ id: parent.id, title: "Roadmap" });
+    expect(loadedChild?.messages).toHaveLength(1);
+    expect(loadedChild?.messages[0].role).toBe("owner");
+    expect(loadedChild?.messages[0].body).toBe("Theme 2 deserves its own thread — let's scope it.");
+
+    // Forward link (parent→child): both a derived branches list and an inline `branch` card.
+    const reloadedParent = await getThread(parent.id);
+    expect(reloadedParent?.branches).toContainEqual({
+      id: child.id,
+      title: "Theme 2 as its own effort",
+    });
+    const branchCard = reloadedParent?.messages.find((m) => m.type === "branch");
+    expect(branchCard).toBeTruthy();
+    const meta = parseMeta(branchCard?.meta ?? null);
+    expect(meta.childThreadId).toBe(child.id);
+    expect(meta.refUrl).toBe(`/threads/${child.id}`);
+  });
+
+  it("branching does not change the parent's turn/status (a branch is not a reply)", async () => {
+    const parent = await createThread("Keep working", "Please keep building.");
+    expect((await getThread(parent.id))?.thread.status).toBe("working");
+    await branchThread({ parentId: parent.id, title: "Tangent", body: "A side thought." });
+    // Still `working` — only `updatedAt` was bumped so the parent resurfaces.
+    expect((await getThread(parent.id))?.thread.status).toBe("working");
+  });
+
+  it("followups thread cleanly on a branched child", async () => {
+    const parent = await createThread("P", "…");
+    const child = await branchThread({ parentId: parent.id, title: "Child", body: "Scope this." });
+    await addMessage(child.id, "agent", "Drafted a ticket.", {
+      status: "needs-you",
+      meta: { author: "chief-of-staff" },
+    });
+    const loaded = await getThread(child.id);
+    expect(loaded?.thread.status).toBe("needs-you");
+    expect(loaded?.messages).toHaveLength(2); // opener + followup, both on the child
+    expect(loaded?.parent?.id).toBe(parent.id); // link intact after the followup
+  });
+
+  it("a non-branched thread has no parent and no branches", async () => {
+    const t = await createThread("Solo", "No branches here.");
+    const loaded = await getThread(t.id);
+    expect(loaded?.parent).toBeNull();
+    expect(loaded?.branches).toEqual([]);
+  });
+});
+
+describe("generated feature-request cards (work-032)", () => {
+  it("addGeneratedRequest records a first-class card linking to its created ticket", async () => {
+    const thread = await createThread("New idea", "Could we branch tangents into threads?");
+    await addGeneratedRequest(thread.id, {
+      label: "Thread branching + generated-request cards",
+      body: "Distilled from this thread — branch tangents into linked child threads.",
+      refUrl: "/work/032",
+      refLabel: "work-032",
+    });
+
+    const loaded = await getThread(thread.id);
+    const card = loaded?.messages.find((m) => m.type === "generated-request");
+    expect(card).toBeTruthy();
+    expect(card?.role).toBe("agent"); // org-authored → never enters the Human-Input Log
+    const meta = parseMeta(card?.meta ?? null);
+    expect(meta.label).toBe("Thread branching + generated-request cards");
+    expect(meta.refUrl).toBe("/work/032");
+    expect(meta.refLabel).toBe("work-032");
+    expect(meta.author).toBe("chief-of-staff");
+  });
+
+  it("a generated request can park the thread on the Owner", async () => {
+    const thread = await createThread("Idea 2", "Another one.");
+    await addGeneratedRequest(thread.id, {
+      label: "A ticket",
+      refUrl: "/work/099",
+      status: "needs-you",
+    });
+    expect((await getThread(thread.id))?.thread.status).toBe("needs-you");
   });
 });
 

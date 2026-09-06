@@ -3,7 +3,7 @@ import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations } from "~/db/schema";
 import { type AgentMessage, agentRespondStream } from "./agent.server";
 import { effectiveChatModel } from "./models.server";
-import type { MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
+import type { BranchLink, MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
 
 /**
  * CoS-Threads data layer (work-029, ADR-012). A **thread** is a `conversation`; its
@@ -15,6 +15,7 @@ import type { MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads
  */
 
 export type {
+  BranchLink,
   MessageMeta,
   Thread,
   ThreadInitiator,
@@ -28,9 +29,19 @@ export async function listThreads(): Promise<Thread[]> {
   return db.select().from(conversations).orderBy(desc(conversations.updatedAt));
 }
 
-export async function getThread(
-  id: number,
-): Promise<{ thread: Thread; messages: ThreadMessage[] } | null> {
+/**
+ * Load a thread with its timeline plus its branch links both ways (work-032): `parent` is
+ * the thread this one was branched from (via `parentId`, or null), and `branches` are the
+ * child threads branched off this one (derived by querying `parentId`), newest first. The
+ * inline `branch` cards in the timeline give the same forward link at the split point; the
+ * `branches` list is the durable header/footer view even after the card scrolls away.
+ */
+export async function getThread(id: number): Promise<{
+  thread: Thread;
+  messages: ThreadMessage[];
+  parent: BranchLink | null;
+  branches: BranchLink[];
+} | null> {
   await ensureSchema();
   const [thread] = await db.select().from(conversations).where(eq(conversations.id, id));
   if (!thread) return null;
@@ -39,7 +50,24 @@ export async function getThread(
     .from(conversationMessages)
     .where(eq(conversationMessages.conversationId, id))
     .orderBy(conversationMessages.at);
-  return { thread, messages };
+
+  let parent: BranchLink | null = null;
+  if (thread.parentId != null) {
+    const [p] = await db
+      .select({ id: conversations.id, title: conversations.title })
+      .from(conversations)
+      .where(eq(conversations.id, thread.parentId));
+    if (p) parent = { id: p.id, title: p.title };
+  }
+
+  const children = await db
+    .select({ id: conversations.id, title: conversations.title })
+    .from(conversations)
+    .where(eq(conversations.parentId, id))
+    .orderBy(desc(conversations.updatedAt));
+  const branches: BranchLink[] = children.map((c) => ({ id: c.id, title: c.title }));
+
+  return { thread, messages, parent, branches };
 }
 
 /** The Owner opens a thread (an ask/tell). Status starts `working` — the org's turn. */
@@ -115,6 +143,107 @@ export async function orgFollowup(
   await addMessage(threadId, "agent", body, {
     status: opts.status ?? "needs-you",
     meta: { author: opts.author ?? "chief-of-staff" },
+  });
+}
+
+type BranchOpts = {
+  parentId: number;
+  title: string;
+  body: string;
+  /** The timeline point in the parent the tangent split from (the "from a point" record). */
+  fromMessageId?: number | null;
+  kind?: string;
+  /** The branching author's label for the parent's inline `branch` card (default `you`). */
+  author?: string;
+};
+
+/**
+ * Branch a child thread from a point in a parent (work-032). Creates a new thread linked
+ * **both ways** — the child carries `parentId` + `branchedFromMessageId` (the reverse link
+ * and the split point), and a typed `branch` card is dropped into the parent at that point,
+ * deep-linking to the child. The child opens with the Owner's tangent message on the org's
+ * turn (`working`), exactly like `createThread`; followups then thread cleanly on the child.
+ * Additive on the conversation primitive — no reshape.
+ */
+export async function branchThread(opts: BranchOpts): Promise<Thread> {
+  await ensureSchema();
+  const now = Date.now();
+  const [child] = await db
+    .insert(conversations)
+    .values({
+      kind: opts.kind ?? "request",
+      title: opts.title,
+      status: "working",
+      initiator: "owner",
+      parentId: opts.parentId,
+      branchedFromMessageId: opts.fromMessageId ?? null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  await db.insert(conversationMessages).values({
+    conversationId: child.id,
+    role: "owner",
+    type: "message",
+    body: opts.body,
+    at: now,
+  });
+  // The forward link: an inline `branch` card in the parent at the split point, pointing to
+  // the child. Insert directly so the parent's turn/status is untouched (a branch is not a
+  // reply) — only its `updatedAt` is bumped so it resurfaces.
+  await db.insert(conversationMessages).values({
+    conversationId: opts.parentId,
+    role: opts.author && opts.author !== "you" ? "agent" : "owner",
+    type: "branch",
+    body: opts.body,
+    meta: JSON.stringify({
+      label: opts.title,
+      refUrl: `/threads/${child.id}`,
+      childThreadId: child.id,
+      childThreadTitle: opts.title,
+      ...(opts.author ? { author: opts.author } : {}),
+    } satisfies MessageMeta),
+    at: now,
+  });
+  await db.update(conversations).set({ updatedAt: now }).where(eq(conversations.id, opts.parentId));
+  return child;
+}
+
+type GeneratedRequestOpts = {
+  /** The feature-request headline. */
+  label: string;
+  /** A one-line summary of the request (the card body). */
+  body?: string;
+  /** Deep link to the ticket/PRD this request created. */
+  refUrl: string;
+  /** Short link label (e.g. the ticket id `work-032`). */
+  refLabel?: string;
+  /** The generating author (default `chief-of-staff`). */
+  author?: string;
+  /** Optionally flip the thread's turn (a generated request often parks it on the Owner). */
+  status?: ThreadStatus;
+};
+
+/**
+ * Record a **generated feature request** as a first-class inline card in a thread (work-032)
+ * — the org distilled a request from the conversation and created a ticket/PRD for it. It's a
+ * `generated-request` typed row (reusing the `type` discriminator, ADR-012) whose meta carries
+ * the created artifact's deep link, rendered as a card the Owner can click through. Authored by
+ * the org (`agent` role), so it never enters the Human-Input Log.
+ */
+export async function addGeneratedRequest(
+  threadId: number,
+  opts: GeneratedRequestOpts,
+): Promise<void> {
+  await addMessage(threadId, "agent", opts.body ?? "", {
+    type: "generated-request",
+    status: opts.status,
+    meta: {
+      author: opts.author ?? "chief-of-staff",
+      label: opts.label,
+      refUrl: opts.refUrl,
+      ...(opts.refLabel ? { refLabel: opts.refLabel } : {}),
+    },
   });
 }
 

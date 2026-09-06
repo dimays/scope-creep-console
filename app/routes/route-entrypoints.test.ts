@@ -3,6 +3,7 @@ import { action as chatProposeAction } from "./chat-propose";
 import { loader as healthzLoader } from "./healthz";
 import { loader as proposeLoader } from "./propose";
 import { action as settingsAction, loader as settingsLoader } from "./settings";
+import { action as threadAction, loader as threadLoader } from "./thread";
 import { action as threadsAction, loader as threadsLoader } from "./threads";
 import { loader as requestsRedirect } from "./work-requests";
 
@@ -46,6 +47,57 @@ describe("route: /threads (work-029, ADR-012)", () => {
     } as never)) as Response;
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toMatch(/^\/threads\/\d+$/);
+  });
+});
+
+describe("route: /threads/:id branching (work-032)", () => {
+  // Open a parent thread, then branch a tangent off it through the route action.
+  async function openThread(title: string, body: string): Promise<number> {
+    const form = new FormData();
+    form.set("title", title);
+    form.set("body", body);
+    const res = (await threadsAction({
+      request: new Request("http://localhost/threads", { method: "POST", body: form }),
+    } as never)) as Response;
+    return Number(res.headers.get("location")?.split("/").pop());
+  }
+
+  it("branch intent creates a linked child and redirects to it", async () => {
+    const parentId = await openThread("Parent", "Let's discuss.");
+
+    const form = new FormData();
+    form.set("intent", "branch");
+    form.set("title", "A tangent");
+    form.set("body", "This deserves its own thread.");
+    const res = (await threadAction({
+      request: new Request(`http://localhost/threads/${parentId}`, { method: "POST", body: form }),
+      params: { id: String(parentId) },
+    } as never)) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get("location") ?? "";
+    expect(loc).toMatch(/^\/threads\/\d+$/);
+    const childId = Number(loc.split("/").pop());
+    expect(childId).not.toBe(parentId);
+
+    // The child loads with a backlink to the parent; the parent lists the child as a branch.
+    const child = await threadLoader({ params: { id: String(childId) } } as never);
+    expect(child.parent?.id).toBe(parentId);
+    const parent = await threadLoader({ params: { id: String(parentId) } } as never);
+    expect(parent.branches.some((b) => b.id === childId)).toBe(true);
+  });
+
+  it("branch intent rejects empty input", async () => {
+    const parentId = await openThread("Parent 2", "…");
+    const form = new FormData();
+    form.set("intent", "branch");
+    form.set("title", "");
+    form.set("body", "");
+    const res = await threadAction({
+      request: new Request(`http://localhost/threads/${parentId}`, { method: "POST", body: form }),
+      params: { id: String(parentId) },
+    } as never);
+    expect(res).toEqual({ ok: false });
   });
 });
 

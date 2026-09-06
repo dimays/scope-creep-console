@@ -804,6 +804,80 @@ a.console__item-name:hover {
   text-decoration: underline;
 }
 
+/* Generated feature request card (work-032): green accent — an org-created artifact. */
+.outcome-card--genreq {
+  border-left-color: #3aa76d;
+}
+
+.outcome-card--genreq .outcome-card__badge {
+  color: #3aa76d;
+}
+
+/* Branch marker card (work-032): warm accent — a tangent split into a child thread. */
+.outcome-card--branch {
+  border-left-color: #e8833a;
+}
+
+.outcome-card--branch .outcome-card__badge {
+  color: #e8833a;
+}
+
+/* Branch backlink under a child thread's title. */
+.thread-branchline {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--sc-muted);
+}
+
+/* The forward-link "Branches" list on a parent thread. */
+.thread-branches {
+  margin-top: 1.25rem;
+}
+
+.thread-dot--branch {
+  background: #e8833a;
+}
+
+/* Branch-a-tangent affordance below the reply box. */
+.thread-branch-toggle {
+  margin-top: 0.9rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--sc-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.thread-branch-toggle:hover {
+  text-decoration: underline;
+}
+
+.thread-branch-form {
+  margin-top: 0.9rem;
+  border: 1px dashed var(--sc-border);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+
+.thread-branch-form__hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--sc-muted);
+}
+
+.thread-branch-cancel {
+  background: none;
+  border: none;
+  color: var(--sc-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.thread-branch-cancel:hover {
+  text-decoration: underline;
+}
+
 /* human-input log */
 .spine {
   list-style: none;

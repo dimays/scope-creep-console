@@ -38,6 +38,13 @@ export type Feedback = typeof feedback.$inferSelect;
  * `org` when the Chief of Staff opens one to get the Owner's input (work-030). It's
  * additive: an org opener is an `agent` message, so it never enters the Human-Input Log
  * (which unions only `role = owner`).
+ *
+ * Branching (work-032): a thread can be a **child branched from a point in a parent** —
+ * `parentId` is the reverse link (child→parent) and `branchedFromMessageId` records the
+ * timeline point it split from. The forward link (parent→children) is derived by querying
+ * `parentId`, and a typed `branch` card is dropped in the parent at the split point, so the
+ * two threads are linked both ways with no reshape. Both columns are nullable — a plain
+ * (non-branched) thread leaves them null.
  */
 export const conversations = sqliteTable("conversations", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -45,16 +52,20 @@ export const conversations = sqliteTable("conversations", {
   title: text("title").notNull().default(""),
   status: text("status").notNull().default("open"),
   initiator: text("initiator").notNull().default("owner"),
+  parentId: integer("parent_id"),
+  branchedFromMessageId: integer("branched_from_message_id"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
 
 /**
  * A thread's timeline item. `type` discriminates a plain `message` from a typed card:
- * `outcome` (a request-intake result — ticket created, decline-with-reason, …). Later
- * phases add `agent-activity` (work-031) and `generated-request` (work-032) on this same
- * column — additive, no reshape. `meta` is optional JSON for the card (author label,
- * outcome kind, deep-link refUrl).
+ * `outcome` (a request-intake result — ticket created, decline-with-reason, …),
+ * `generated-request` (work-032 — a generated feature request linking to the ticket/PRD it
+ * created), and `branch` (work-032 — an in-parent marker pointing to a child thread). A
+ * later phase adds `agent-activity` (work-031) on this same column — additive, no reshape.
+ * `meta` is optional JSON for the card (author label, outcome/card label, deep-link refUrl,
+ * and for a `branch` card the child thread it points to).
  */
 export const conversationMessages = sqliteTable("conversation_messages", {
   id: integer("id").primaryKey({ autoIncrement: true }),

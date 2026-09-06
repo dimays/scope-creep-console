@@ -45,14 +45,33 @@ export function groupThreads(threads: Thread[]): ThreadGroups {
   return groups;
 }
 
+/** A lightweight parent↔child link for a branched thread (work-032). */
+export type BranchLink = {
+  id: number;
+  title: string;
+};
+
 /** Optional typed-card payload carried in `conversation_messages.meta` (JSON). */
 export type MessageMeta = {
   /** Original author label when a non-owner message was normalized to role `agent`. */
   author?: string;
-  /** For a `type = "outcome"` card: the outcome label and a deep link to its artifact. */
+  /**
+   * For a typed card (`outcome`, `generated-request`, `branch`): the card's headline and a
+   * deep link to its artifact (the created ticket/PRD, or the child thread for a `branch`).
+   */
   label?: string;
   refUrl?: string;
+  /** Optional short label for the deep link (e.g. the ticket id `work-032`). */
+  refLabel?: string;
+  /** For a `branch` card in a parent: the child thread it points to (work-032). */
+  childThreadId?: number;
+  childThreadTitle?: string;
 };
+
+/** A branched thread's title reads plainly when empty. */
+export function threadTitle(t: { title: string }): string {
+  return t.title || "Untitled thread";
+}
 
 export function parseMeta(raw: string | null): MessageMeta {
   if (!raw) return {};
