@@ -104,3 +104,35 @@ export function selectTaskModelId(task: ModelTask, catalog: ModelCatalog): strin
   if (isValidModelId(chatDefault, catalog)) return chatDefault;
   return HARDCODED_CHAT_MODEL;
 }
+
+export type ModelPreset = {
+  /** The raw catalog id, e.g. "claude-sonnet-5". */
+  id: string;
+  /** A short human label, e.g. "Sonnet" / "Haiku" / "Opus". */
+  short: string;
+  /** The catalog tier, e.g. "balanced" / "fast" / "flagship", or "custom" if unknown. */
+  tier: string;
+};
+
+/**
+ * Turn a template's `default_model` id into a compact preset badge for the org view —
+ * the model each kind of employee runs (ADR-020 §D / staffing §4). Pure + client-safe:
+ * the `short` name is derived from the id (so a new Claude id still labels sensibly) and
+ * the `tier` is resolved from the catalog (FALLBACK by default). Returns null for a
+ * missing id so callers can render "no preset".
+ */
+export function modelPreset(
+  id: string | null | undefined,
+  catalog: ModelCatalog = FALLBACK_CATALOG,
+): ModelPreset | null {
+  if (!id) return null;
+  const short = /opus/i.test(id)
+    ? "Opus"
+    : /sonnet/i.test(id)
+      ? "Sonnet"
+      : /haiku/i.test(id)
+        ? "Haiku"
+        : id;
+  const tier = catalog.models.find((m) => m.id === id)?.tier ?? "custom";
+  return { id, short, tier };
+}

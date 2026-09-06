@@ -3,7 +3,8 @@ import { Link } from "react-router";
 import { ExploreNav } from "~/components/explore-nav";
 import { agentDisplayName } from "~/lib/display-name";
 import { slugify } from "~/lib/employee-scaffold";
-import type { OrgEmployee, OrgExec, TicketRef } from "~/lib/org.server";
+import { modelPreset } from "~/lib/models";
+import type { OrgEmployee, OrgExec, OrgFunction, OrgTemplate, TicketRef } from "~/lib/org.server";
 import { readOrg } from "~/lib/org.server";
 import { listWork } from "~/lib/work.server";
 import type { Route } from "./+types/explore-agents";
@@ -50,11 +51,14 @@ export default function ExploreAgents({ loaderData }: Route.ComponentProps) {
       )}
 
       <p className="doc-path">
-        {tree.execs.length} executive{tree.execs.length === 1 ? "" : "s"} · {employeeTotal} employee
-        {employeeTotal === 1 ? "" : "s"} · staffing is derived from work-item assignees (ADR-017).
+        {tree.execs.length} executive{tree.execs.length === 1 ? "" : "s"} · {tree.functions.length}{" "}
+        standing function{tree.functions.length === 1 ? "" : "s"} · {employeeTotal} employee
+        {employeeTotal === 1 ? "" : "s"} · four tiers per ADR-020; staffing derived from work-item
+        assignees (ADR-017).
       </p>
 
-      {/* The reporting tree: Owner → execs → employees. */}
+      {/* Tier 1 (executives) + tier 3 (employees) + tier 4 (the summon catalog): the
+          reporting tree Owner → execs → employees, each exec carrying what it can summon. */}
       <section className="org">
         <div className="org__owner">
           <span className="org__owner-dot" aria-hidden />
@@ -76,12 +80,17 @@ export default function ExploreAgents({ loaderData }: Route.ComponentProps) {
               {tree.orphans.map((emp) => (
                 <li key={emp.name} className="console__item">
                   <EmployeeName emp={emp} />
+                  <EmployeeStatus status={emp.status} />
                 </li>
               ))}
             </ul>
           </div>
         )}
       </section>
+
+      {/* Tier 2: the standing functions — permanent, cross-org execution. Rendered apart
+          from the executive tree and from employees so they read as neither (ADR-020 §B). */}
+      <StandingFunctions functions={tree.functions} />
 
       {/* Gated authoring (ADR-009 / ADR-017): everything opens a PR the Owner merges. */}
       <SpinUpEmployee execNames={execNames} templates={templates} tickets={tickets} />
@@ -97,7 +106,7 @@ function ExecNode({ exec }: { exec: OrgExec }) {
         <Link to={`/explore/agents/${exec.name}`} className="org__exec-name">
           {agentDisplayName(exec.name)}
         </Link>
-        {exec.kind && exec.kind !== "core" && <span className="console__tag">{exec.kind}</span>}
+        <span className="org__tier-tag org__tier-tag--exec">executive</span>
         <span className="org__counts">
           {exec.employees.length} report{exec.employees.length === 1 ? "" : "s"} ·{" "}
           {exec.ownedTicketCount} owned · {exec.staffedTicketCount} staffed
@@ -111,21 +120,114 @@ function ExecNode({ exec }: { exec: OrgExec }) {
             <li key={emp.name} className="org__report">
               <div className="org__report-head">
                 <EmployeeName emp={emp} />
+                <EmployeeStatus status={emp.status} />
                 {emp.template && (
                   <Link to={`/explore/templates/${emp.template}`} className="console__tag org__tpl">
                     {emp.template}
                   </Link>
                 )}
-                {emp.status && emp.status !== "active" && (
-                  <span className="console__tag">{emp.status}</span>
-                )}
+                {emp.defaultModel && <ModelBadge id={emp.defaultModel} override />}
               </div>
               <TicketChips tickets={emp.tickets} emptyLabel="available — not staffed" />
             </li>
           ))}
         </ul>
       )}
+      <SummonCatalog templates={exec.templates} />
     </li>
+  );
+}
+
+/** The per-exec summon catalog (ADR-020 §D): "the types of employees I can summon." */
+function SummonCatalog({ templates }: { templates: OrgTemplate[] }) {
+  if (templates.length === 0) return null;
+  return (
+    <div className="org__catalog">
+      <span className="org__catalog-label">Can summon</span>
+      <ul className="org__templates">
+        {templates.map((t) => (
+          <li key={t.name} className="org__template">
+            <Link to={`/explore/templates/${t.name}`} className="org__template-name">
+              {t.name}
+            </Link>
+            <ModelBadge id={t.defaultModel} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** A model preset badge — the tier each kind of employee runs (ADR-020 §D / staffing §4). */
+function ModelBadge({ id, override = false }: { id?: string; override?: boolean }) {
+  const preset = modelPreset(id);
+  if (!preset) return null;
+  return (
+    <span
+      className="org__preset"
+      title={
+        override
+          ? `Per-employee model override: ${preset.id} (${preset.tier} tier)`
+          : `Model preset: ${preset.id} (${preset.tier} tier)`
+      }
+    >
+      {override && <span className="org__preset-flag">override</span>}
+      {preset.short}
+      <span className="org__preset-tier">{preset.tier}</span>
+    </span>
+  );
+}
+
+/** Employee lifecycle status pill (ADR-020 §C): active | idle | retired. */
+function EmployeeStatus({ status }: { status?: string }) {
+  if (!status) return null;
+  const kind = status === "retired" || status === "idle" ? status : "active";
+  return (
+    <span
+      className={`org__status org__status--${kind}`}
+      title={
+        kind === "retired"
+          ? "Retired — dissolved; employees are ephemeral (ADR-020 §C)"
+          : kind === "idle"
+            ? "Idle — summoned, awaiting staffing or between tickets"
+            : "Active"
+      }
+    >
+      {status}
+    </span>
+  );
+}
+
+/** The standing-function tier (ADR-020 §B) — permanent cross-org execution. */
+function StandingFunctions({ functions }: { functions: OrgFunction[] }) {
+  if (functions.length === 0) return null;
+  return (
+    <section className="org-tier org-tier--functions">
+      <div className="org-tier__head">
+        <h2 className="doc-group__title">Standing functions</h2>
+        <span className="console__count">{functions.length}</span>
+      </div>
+      <p className="console__empty org-tier__lede">
+        Permanent, cross-org functions — they hold <em>execution</em>, not a domain. Not executives,
+        not summoned per-ticket like employees: any exec's work routes "prove it" and "land it" here
+        (ADR-020 §B).
+      </p>
+      <ul className="org__functions">
+        {functions.map((fn) => (
+          <li key={fn.name} className="org__function">
+            <div className="org__function-head">
+              <Link to={`/explore/agents/${fn.name}`} className="org__function-name">
+                {agentDisplayName(fn.name)}
+              </Link>
+              <span className="org__tier-tag org__tier-tag--function">function</span>
+              <EmployeeStatus status={fn.status} />
+            </div>
+            {fn.description && <p className="org__function-desc">{fn.description}</p>}
+            <TicketChips tickets={fn.tickets} emptyLabel="no active tickets" />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
