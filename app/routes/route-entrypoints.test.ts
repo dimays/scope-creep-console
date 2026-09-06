@@ -10,6 +10,7 @@ import { loader as proposeLoader } from "./propose";
 import { action as settingsAction, loader as settingsLoader } from "./settings";
 import { action as threadAction, loader as threadLoader } from "./thread";
 import { action as threadsAction, loader as threadsLoader } from "./threads";
+import { action as archiveAction, loader as archiveLoader } from "./threads-archive";
 import { loader as requestsRedirect } from "./work-requests";
 
 // Exercises route loaders/actions end to end against the in-memory db (vitest
@@ -129,6 +130,71 @@ describe("route: /threads/:id branching (work-032)", () => {
 
     if (prev === undefined) delete process.env.CLAUDE_PROJECTS_DIR;
     else process.env.CLAUDE_PROJECTS_DIR = prev;
+  });
+});
+
+describe("route: archive / restore threads (work-049)", () => {
+  async function openThread(title: string, body: string): Promise<number> {
+    const form = new FormData();
+    form.set("title", title);
+    form.set("body", body);
+    const res = (await threadsAction({
+      request: new Request("http://localhost/threads", { method: "POST", body: form }),
+    } as never)) as Response;
+    return Number(res.headers.get("location")?.split("/").pop());
+  }
+
+  it("archive intent redirects to /threads and removes the thread from the main list", async () => {
+    const id = await openThread("Archive me via route", "Please tuck this away.");
+    const form = new FormData();
+    form.set("intent", "archive");
+    const res = (await threadAction({
+      request: new Request(`http://localhost/threads/${id}`, { method: "POST", body: form }),
+      params: { id: String(id) },
+    } as never)) as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/threads");
+
+    // Gone from the main Threads UI…
+    const main = await threadsLoader({} as never);
+    expect(main.threads.some((t) => t.id === id)).toBe(false);
+    // …and present in the Archive view.
+    const archive = await archiveLoader({} as never);
+    expect(archive.threads.some((t) => t.id === id)).toBe(true);
+  });
+
+  it("restore returns an archived thread to the main list", async () => {
+    const id = await openThread("Round-trip via route", "Archive then restore.");
+    const archiveForm = new FormData();
+    archiveForm.set("intent", "archive");
+    await threadAction({
+      request: new Request(`http://localhost/threads/${id}`, { method: "POST", body: archiveForm }),
+      params: { id: String(id) },
+    } as never);
+
+    const restoreForm = new FormData();
+    restoreForm.set("intent", "restore");
+    restoreForm.set("id", String(id));
+    const res = (await archiveAction({
+      request: new Request("http://localhost/threads/archive", {
+        method: "POST",
+        body: restoreForm,
+      }),
+    } as never)) as { ok: boolean };
+    expect(res.ok).toBe(true);
+
+    const main = await threadsLoader({} as never);
+    expect(main.threads.some((t) => t.id === id)).toBe(true);
+    const archive = await archiveLoader({} as never);
+    expect(archive.threads.some((t) => t.id === id)).toBe(false);
+  });
+
+  it("archive loader returns an array and threads loader exposes an archived count", async () => {
+    const archive = await archiveLoader({} as never);
+    expect(Array.isArray(archive.threads)).toBe(true);
+    const main = await threadsLoader({} as never);
+    expect(typeof main.archivedCount).toBe("number");
+    expect(main.archivedCount).toBeGreaterThanOrEqual(0);
   });
 });
 

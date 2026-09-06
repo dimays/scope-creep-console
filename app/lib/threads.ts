@@ -11,12 +11,21 @@ export type Thread = Conversation;
 export type ThreadMessage = ConversationMessage;
 
 /**
+ * Whether a thread is archived (work-049) — orthogonal to `status`. Archived threads leave
+ * the main Threads UI and all its groupings; they live in the Archive view until restored.
+ */
+export function isArchived(t: Thread): boolean {
+  return t.archivedAt != null;
+}
+
+/**
  * The Owner's "needs-you" queue (work-030): threads parked on him, awaiting his turn.
  * Pure derivation over the stored `needs-you` state so the home badge and the Threads
- * surface read from one source of truth.
+ * surface read from one source of truth. Archived threads (work-049) never count toward the
+ * queue or badge, even if their stored status is `needs-you`.
  */
 export function needsYouThreads(threads: Thread[]): Thread[] {
-  return threads.filter((t) => (t.status as ThreadStatus) === "needs-you");
+  return threads.filter((t) => !isArchived(t) && (t.status as ThreadStatus) === "needs-you");
 }
 
 export type ThreadGroups = {
@@ -34,7 +43,11 @@ export type ThreadGroups = {
  * (work-030 acceptance). A thread is in exactly one group.
  */
 export function groupThreads(threads: Thread[]): ThreadGroups {
-  const byRecent = [...threads].sort((a, b) => b.updatedAt - a.updatedAt);
+  // Archived threads (work-049) never appear in the main groupings — they live in the
+  // Archive view. Filter here too so any caller of this pure helper is safe by default.
+  const byRecent = [...threads]
+    .filter((t) => !isArchived(t))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
   const groups: ThreadGroups = { needsYou: [], active: [], closed: [] };
   for (const t of byRecent) {
     const status = t.status as ThreadStatus;

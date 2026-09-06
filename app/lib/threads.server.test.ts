@@ -3,6 +3,7 @@ import { parseMeta } from "./threads";
 import {
   addGeneratedRequest,
   addMessage,
+  archiveThread,
   branchThread,
   createOrgThread,
   createThread,
@@ -10,8 +11,10 @@ import {
   getThread,
   launchThread,
   linkThreadSession,
+  listArchivedThreads,
   listThreads,
   orgFollowup,
+  restoreThread,
   setStatus,
 } from "./threads.server";
 
@@ -220,6 +223,59 @@ describe("thread launcher (work-046, ADR-016)", () => {
     const loaded = await getThread(t.id);
     expect(loaded?.thread.launchedAt).toBeNull();
     expect(loaded?.thread.sessionUuid).toBeNull();
+  });
+});
+
+describe("archive / restore threads (work-049)", () => {
+  it("archiveThread sets archived_at and restoreThread clears it", async () => {
+    const t = await createThread("Wrap it up", "This one is done — tuck it away.");
+    expect((await getThread(t.id))?.thread.archivedAt).toBeNull();
+
+    await archiveThread(t.id);
+    const archived = await getThread(t.id);
+    expect(archived?.thread.archivedAt).toBeTruthy();
+    // Orthogonal to status — the lifecycle is untouched by archiving.
+    expect(archived?.thread.status).toBe("working");
+
+    await restoreThread(t.id);
+    expect((await getThread(t.id))?.thread.archivedAt).toBeNull();
+  });
+
+  it("archive is orthogonal to status — a closed thread can be archived and restored", async () => {
+    const t = await createThread("Closed then archived", "Done and away.");
+    await setStatus(t.id, "closed");
+    await archiveThread(t.id);
+    const loaded = await getThread(t.id);
+    expect(loaded?.thread.status).toBe("closed"); // status preserved
+    expect(loaded?.thread.archivedAt).toBeTruthy();
+    await restoreThread(t.id);
+    expect((await getThread(t.id))?.thread.status).toBe("closed"); // still closed after restore
+    expect((await getThread(t.id))?.thread.archivedAt).toBeNull();
+  });
+
+  it("listThreads excludes archived; listArchivedThreads includes only archived", async () => {
+    const live = await createThread("Stay visible", "Keep me on the board.");
+    const gone = await createThread("Hide me", "Off the board, please.");
+    await archiveThread(gone.id);
+
+    const main = await listThreads();
+    expect(main.some((t) => t.id === live.id)).toBe(true);
+    expect(main.some((t) => t.id === gone.id)).toBe(false);
+    expect(main.every((t) => t.archivedAt == null)).toBe(true);
+
+    const archived = await listArchivedThreads();
+    expect(archived.some((t) => t.id === gone.id)).toBe(true);
+    expect(archived.some((t) => t.id === live.id)).toBe(false);
+    expect(archived.every((t) => t.archivedAt != null)).toBe(true);
+  });
+
+  it("restore returns a thread to the main list", async () => {
+    const t = await createThread("Round trip", "Archive then restore me.");
+    await archiveThread(t.id);
+    expect((await listThreads()).some((x) => x.id === t.id)).toBe(false);
+    await restoreThread(t.id);
+    expect((await listThreads()).some((x) => x.id === t.id)).toBe(true);
+    expect((await listArchivedThreads()).some((x) => x.id === t.id)).toBe(false);
   });
 });
 
