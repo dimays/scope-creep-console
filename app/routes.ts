@@ -10,9 +10,12 @@ export default [
   route("thread/send", "routes/thread-send.tsx"),
   // Live agent-chat resource + chatbot preview/merge flow (unchanged; ChatMount posts here).
   route("chat/send", "routes/chat-send.tsx"),
+  route("chat/propose", "routes/chat-propose.tsx"),
   route("chat/preview", "routes/chat-preview.tsx"),
   route("chat/land", "routes/chat-land.tsx"),
   route("chat/decline", "routes/chat-decline.tsx"),
+  // Flagship (work-017): describe a change → agent-drafted, isolated diff → gated PR.
+  route("propose", "routes/propose.tsx"),
   // Legacy redirect → Threads (old top-level Chat tab).
   route("chat", "routes/chat.tsx"),
   route("explore", "routes/explore.tsx"),
