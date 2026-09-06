@@ -9,12 +9,15 @@
   resource route (`app/routes/thread-send.tsx` + its `routes.ts` line, only ever called by
   `ThreadReply`), and `threadReplyStream` + its private `threadHistory` helper from
   `threads.server.ts` — the last Threads-reachable caller of the Anthropic Messages API
-  (`agentRespondStream`). The stale ADR-013 streaming-turn references in the `threads.server.ts`
-  module doc comment and the `.req-actions` CSS comment are updated accordingly. **No behavior
-  change**: none of this was reachable after ADR-016. `agent.server.ts` is untouched — its
-  `agentRespond` / `toAnthropicMessages` remain in use by the conversation/propose paths and the
-  chatbot extension's own API-keyed, ToS-clean build-tool path (ADR-016). `agentRespondStream`
-  now has no in-repo callers but is left exported in agent.server rather than reshape it here.
+  (`agentRespondStream`). With that caller gone, **`agentRespondStream` itself is removed from
+  `agent.server.ts`** — it had no remaining callers anywhere (verified: the `@scope-creep/ext-chatbot`
+  extension is a client-side UI mount that makes no Claude calls, and the console's `chat/send`
+  route uses the non-streaming `agentRespond` via `conversation.server`). The stale ADR-013
+  streaming-turn references in the `threads.server.ts` module doc comment and the `.req-actions`
+  CSS comment are updated accordingly. **No behavior change**: none of this was reachable after
+  ADR-016. The rest of `agent.server.ts` is untouched — `agentRespond` / `toAnthropicMessages`
+  remain in use by the conversation/propose paths and the chatbot extension's own API-keyed,
+  ToS-clean build-tool path (ADR-016).
 
 ## 0.20.0 — 2026-09-06
 - **Threads launcher + transcript projection** (work-046 + work-047, ADR-016): the Threads
