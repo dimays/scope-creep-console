@@ -7,6 +7,8 @@
  * ADR-009 sandbox + gates.
  */
 
+import { clearInterruption, recordInterruption } from "./processing.server";
+
 export type AgentRole = "owner" | "agent" | "system";
 export type AgentMessage = { role: AgentRole; body: string };
 
@@ -57,6 +59,53 @@ function anthropicHeaders(key: string): Record<string, string> {
  */
 const MODEL = (model?: string) => model ?? process.env.CHAT_MODEL ?? "claude-sonnet-5";
 
+/**
+ * Derive a reset ETA (epoch ms) from a 429 response's headers. Prefers Anthropic's
+ * `retry-after` (seconds) and falls back to the `anthropic-ratelimit-*-reset` ISO
+ * timestamps; defaults to +60s when nothing usable is present.
+ */
+function resetAtFromHeaders(headers: Headers, now: number): number {
+  const retryAfter = headers.get("retry-after");
+  if (retryAfter) {
+    const secs = Number(retryAfter);
+    if (Number.isFinite(secs) && secs > 0) return now + secs * 1000;
+    const asDate = Date.parse(retryAfter);
+    if (!Number.isNaN(asDate) && asDate > now) return asDate;
+  }
+  for (const h of ["anthropic-ratelimit-tokens-reset", "anthropic-ratelimit-requests-reset"]) {
+    const iso = headers.get(h);
+    if (iso) {
+      const t = Date.parse(iso);
+      if (!Number.isNaN(t) && t > now) return t;
+    }
+  }
+  return now + 60_000;
+}
+
+/**
+ * Reflect the upstream response into the app-wide processing state (work-011): a 429
+ * records an interruption with a reset ETA; any successful call clears it (processing
+ * resumed). Guarded so it can never break the reply path — the persisted reply/thread
+ * is always the source of truth.
+ */
+async function noteRateLimit(res: Response): Promise<void> {
+  try {
+    if (res.status === 429) {
+      const now = Date.now();
+      await recordInterruption({
+        reason: "Token/rate limit reached",
+        resetAt: resetAtFromHeaders(res.headers, now),
+        detail: "The agent runtime hit Claude's rate limit. New work is paused until it resets.",
+        now,
+      });
+    } else if (res.ok) {
+      await clearInterruption();
+    }
+  } catch {
+    // processing state is advisory; never let it break a reply
+  }
+}
+
 export async function agentRespond(
   history: AgentMessage[],
   userText: string,
@@ -76,6 +125,7 @@ export async function agentRespond(
         messages: toAnthropicMessages(history, userText),
       }),
     });
+    await noteRateLimit(res);
     if (!res.ok) {
       return `The chat runtime reached Claude but got an error (${res.status}). Check the model or key.`;
     }
@@ -125,6 +175,7 @@ export async function* agentRespondStream(
     yield "The chat runtime couldn't reach Claude (network error). Try again.";
     return;
   }
+  await noteRateLimit(res);
   if (!res.ok || !res.body) {
     yield `The chat runtime reached Claude but got an error (${res.status}). Check the model or key.`;
     return;

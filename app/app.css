@@ -900,3 +900,190 @@ a.console__item-name:hover {
   list-style: none;
   color: var(--sc-muted);
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+ * App-state clarity & polish (work-011): one vocabulary for loading /
+ * in-progress / interrupted. Uses the currently-pinned @scope-creep/design
+ * v0.1.0 tokens; the green working accent reuses the literal already used by
+ * the thread working/live indicators above. Follow-up: adopt the v0.2.0
+ * --sc-success / --sc-attention / motion tokens once that tag is cut.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/* Row that holds a form's submit button (settings / threads / thread-reply). */
+.req-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* A small inline spinner, paired with a text label. */
+.spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  vertical-align: -0.12em;
+  animation: sc-spin 0.7s linear infinite;
+}
+
+@keyframes sc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A submit button in its pending state keeps the label + spinner on one line. */
+.btn-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.req-submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* "Agent in progress" pill — reuses the breathing dots from .working. */
+.inprogress {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inprogress__label {
+  font-size: 0.78rem;
+  color: #3aa76d;
+  font-weight: 600;
+}
+
+.card__state,
+.work-item__state {
+  display: inline-flex;
+  margin: 0.15rem 0 0.5rem;
+}
+
+.work-item__state {
+  margin-top: 0.5rem;
+}
+
+/* In-progress uses the working-green dots even in the card context. */
+.inprogress .working__dot {
+  background: #3aa76d;
+}
+
+/* "Blocked" pill — a steady warn dot; work is waiting, not progressing. */
+.blocked-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--sc-warn);
+}
+
+.blocked-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sc-warn);
+}
+
+/* The thread-list working dot gently pulses so "actively working" reads at a glance. */
+.thread-dot--working {
+  animation: sc-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sc-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #3aa76d 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, #3aa76d 0%, transparent);
+  }
+}
+
+.thread-working {
+  border-left-color: #3aa76d;
+}
+
+/* App-wide interrupted / token-limit banner. */
+.interrupted {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  max-width: 960px;
+  margin: 1.25rem auto 0;
+  padding: 0.95rem 1.15rem;
+  background: color-mix(in srgb, var(--sc-warn) 12%, var(--sc-surface));
+  border: 1px solid color-mix(in srgb, var(--sc-warn) 45%, var(--sc-border));
+  border-left: 3px solid var(--sc-warn);
+  border-radius: var(--sc-radius);
+}
+
+.interrupted__icon {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--sc-warn);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sc-warn) 22%, transparent);
+  animation: sc-pulse-warn 1.8s ease-in-out infinite;
+}
+
+@keyframes sc-pulse-warn {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--sc-warn) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--sc-warn) 0%, transparent);
+  }
+}
+
+.interrupted__body {
+  min-width: 0;
+}
+
+.interrupted__title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--sc-text);
+}
+
+.interrupted__detail {
+  margin: 0.25rem 0 0;
+  color: var(--sc-muted);
+  font-size: 0.9rem;
+}
+
+.interrupted__eta {
+  color: var(--sc-warn);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* The working surface, greyed out + inert while the backend is blocked. */
+.app-shell[data-interrupted] {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+  transition: opacity 0.2s ease;
+}
+
+/* Every animation this ticket adds respects reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner,
+  .thread-dot--working,
+  .interrupted__icon {
+    animation: none;
+  }
+  .app-shell[data-interrupted] {
+    transition: none;
+  }
+}

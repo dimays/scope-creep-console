@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { Blocked, InProgress } from "~/components/state";
 import { readWorkItem } from "~/lib/work.server";
 import type { Route } from "./+types/work-item";
 
@@ -22,6 +23,12 @@ export default function WorkItemRoute({ loaderData }: Route.ComponentProps) {
             {item.type} · {item.status} · {item.priority} priority
           </p>
           <h1 className="console__title">{item.title}</h1>
+          {item.status === "active" ? (
+            <InProgress label="In progress" className="work-item__state" />
+          ) : null}
+          {item.status === "blocked" ? (
+            <Blocked label="Blocked" className="work-item__state" />
+          ) : null}
         </div>
         <Link to="/work" className="console__meta">
           ← board

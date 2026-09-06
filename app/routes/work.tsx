@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { Blocked, InProgress } from "~/components/state";
 import { WorkNav } from "~/components/work-nav";
 import { board } from "~/lib/work.server";
 import type { Route } from "./+types/work";
@@ -41,6 +42,12 @@ export default function Work({ loaderData }: Route.ComponentProps) {
                   className={`card card--${item.priority}`}
                 >
                   <p className="card__title">{item.title}</p>
+                  {item.status === "active" ? (
+                    <InProgress label="In progress" className="card__state" />
+                  ) : null}
+                  {item.status === "blocked" ? (
+                    <Blocked label="Blocked" className="card__state" />
+                  ) : null}
                   <div className="card__meta">
                     <span className={`tag tag--${item.type}`}>{item.type}</span>
                     <span className="card__owner">{item.owner}</span>
