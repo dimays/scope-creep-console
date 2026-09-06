@@ -27,7 +27,6 @@
     "@react-router/serve": "8.3.1",
     "@scope-creep/design": "github:dimays/scope-creep-design#v0.2.0",
     "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0",
-    "@scope-creep/ext-chatbot": "github:dimays/scope-creep-ext-chatbot#v0.1.0",
     "drizzle-orm": "^0.36.4",
     "isbot": "^5.1.36",
     "marked": "^18.0.11",

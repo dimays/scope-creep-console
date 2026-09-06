@@ -66,6 +66,7 @@ describe("readRegistry — employees & templates (ADR-017)", () => {
             name: "backend-engineer",
             kind: "template",
             status: "active",
+            owner_agent: "cto",
             default_model: "claude-sonnet-5",
             skills: ["typescript", "drizzle"],
           },
@@ -87,6 +88,8 @@ describe("readRegistry — employees & templates (ADR-017)", () => {
     expect(linus?.template).toBe("backend-engineer");
     expect(registry.templates.map((t) => t.name)).toEqual(["backend-engineer"]);
     expect(registry.templates[0].skills).toEqual(["typescript", "drizzle"]);
+    // ADR-020 §D: the owner_agent that groups the template into an exec's summon catalog.
+    expect(registry.templates[0].owner_agent).toBe("cto");
   });
 
   it("tolerates a control plane without employee-templates.json", async () => {

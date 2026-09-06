@@ -4,6 +4,7 @@ import {
   HARDCODED_CHAT_MODEL,
   isValidModelId,
   type ModelCatalog,
+  modelPreset,
   resolveChatModelId,
   selectTaskModelId,
 } from "./models";
@@ -78,5 +79,45 @@ describe("FALLBACK_CATALOG", () => {
   it("is internally consistent — its chat default is a real model", () => {
     expect(isValidModelId(FALLBACK_CATALOG.defaults.chat, FALLBACK_CATALOG)).toBe(true);
     expect(isValidModelId(HARDCODED_CHAT_MODEL, FALLBACK_CATALOG)).toBe(true);
+  });
+});
+
+describe("modelPreset", () => {
+  it("returns null for a missing id", () => {
+    expect(modelPreset(undefined)).toBeNull();
+    expect(modelPreset(null)).toBeNull();
+    expect(modelPreset("")).toBeNull();
+  });
+
+  it("labels the known catalog ids with a short name and tier", () => {
+    expect(modelPreset("claude-sonnet-5")).toEqual({
+      id: "claude-sonnet-5",
+      short: "Sonnet",
+      tier: "balanced",
+    });
+    expect(modelPreset("claude-haiku-4-5-20251001")).toEqual({
+      id: "claude-haiku-4-5-20251001",
+      short: "Haiku",
+      tier: "fast",
+    });
+    expect(modelPreset("claude-opus-4-8")).toEqual({
+      id: "claude-opus-4-8",
+      short: "Opus",
+      tier: "flagship",
+    });
+  });
+
+  it("derives a short name even for an id not in the catalog, marking the tier custom", () => {
+    expect(modelPreset("claude-sonnet-9-future")).toEqual({
+      id: "claude-sonnet-9-future",
+      short: "Sonnet",
+      tier: "custom",
+    });
+    // A wholly unknown id falls back to the raw id as its short label.
+    expect(modelPreset("some-other-model")).toEqual({
+      id: "some-other-model",
+      short: "some-other-model",
+      tier: "custom",
+    });
   });
 });

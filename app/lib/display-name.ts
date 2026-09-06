@@ -5,12 +5,17 @@
  */
 
 const DISPLAY_NAMES: Record<string, string> = {
+  ceo: "CEO",
   "chief-of-staff": "Chief of Staff",
   cto: "CTO",
   "chief-designer": "Chief Designer",
   "chief-knowledge-manager": "Chief Knowledge Manager",
   "chief-product-officer": "Chief Product Officer",
   "chief-reality-officer": "Chief Reality Officer",
+  // Standing functions (ADR-020 §B) — spelled properly so the org view doesn't title-case
+  // them to "Qa Tester".
+  "qa-tester": "QA Tester",
+  "git-manager": "Git Manager",
 };
 
 /** A known exec's proper name, or a Title-cased fallback from the slug (e.g. "ada" → "Ada"). */

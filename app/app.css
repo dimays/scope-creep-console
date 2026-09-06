@@ -1533,6 +1533,180 @@ a.org__tpl {
   text-decoration: none;
 }
 
+/* Tier tags — a small pill that names which of the four ADR-020 tiers a row is. */
+.org__tier-tag {
+  flex: none;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0.08rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-muted);
+}
+.org__tier-tag--exec {
+  border-color: color-mix(in srgb, var(--sc-accent) 45%, var(--sc-border));
+  color: var(--sc-accent);
+  background: color-mix(in srgb, var(--sc-accent) 10%, transparent);
+}
+.org__tier-tag--function {
+  border-color: color-mix(in srgb, var(--sc-warn) 45%, var(--sc-border));
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 12%, transparent);
+}
+
+/* Employee lifecycle status (active | idle | retired) — retired reads as dissolved. */
+.org__status {
+  flex: none;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.org__status--active {
+  color: var(--sc-success);
+  background: color-mix(in srgb, var(--sc-success) 14%, transparent);
+}
+.org__status--idle {
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 14%, transparent);
+}
+.org__status--retired {
+  color: var(--sc-muted);
+  border-color: var(--sc-border);
+  background: transparent;
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+/* Model-preset badge — the tier each kind of employee runs (ADR-020 §D / staffing §4). */
+.org__preset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  font-size: 0.68rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  padding: 0.05rem 0.35rem 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-text);
+  background: var(--sc-surface);
+}
+.org__preset-tier {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sc-muted);
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  background: var(--sc-tag-bg);
+}
+.org__preset-flag {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sc-accent);
+}
+
+/* Per-exec summon catalog — "the types of employees I can summon" (ADR-020 §D). */
+.org__catalog {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0 0.1rem 0.6rem;
+  border-top: 1px dotted var(--sc-border);
+}
+.org__catalog-label {
+  display: block;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--sc-muted);
+  margin-bottom: 0.4rem;
+}
+.org__templates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.org__template {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.4rem 0.2rem 0.55rem;
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+}
+.org__template-name {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--sc-text);
+  text-decoration: none;
+}
+.org__template-name:hover {
+  color: var(--sc-accent);
+}
+
+/* A distinct tier band, used for the standing functions section. */
+.org-tier {
+  margin: 1.75rem 0 0;
+  padding: 1rem 1.1rem 1.15rem;
+  border: 1px solid var(--sc-border);
+  border-left: 3px solid color-mix(in srgb, var(--sc-warn) 55%, var(--sc-border));
+  border-radius: var(--sc-radius);
+  background: color-mix(in srgb, var(--sc-warn) 5%, var(--sc-surface));
+}
+.org-tier__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.org-tier__lede {
+  margin: 0.4rem 0 0.9rem;
+  max-width: 60ch;
+}
+.org__functions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 0.75rem;
+}
+.org__function {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-bg);
+}
+.org__function-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.org__function-name {
+  font-weight: 600;
+  color: var(--sc-text);
+  text-decoration: none;
+}
+.org__function-name:hover {
+  color: var(--sc-accent);
+}
+.org__function-desc {
+  margin: 0.4rem 0 0.5rem;
+  font-size: 0.82rem;
+  color: var(--sc-muted);
+  line-height: 1.45;
+}
+
 /* Authoring panels */
 .org__authoring {
   border: 1px solid var(--sc-border);

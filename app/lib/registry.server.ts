@@ -10,13 +10,19 @@ import { join } from "node:path";
 
 export type RegistryAgent = {
   name: string;
-  kind?: string; // "core" | "employee" (functional agents are also "core")
-  status?: string;
+  // The four-tier taxonomy (ADR-020): "core" (CEO + C-suite executives),
+  // "function" (permanent cross-org standing functions: qa-tester, git-manager),
+  // "employee" (ephemeral, summoned→staffed→retired), "template" (role catalog).
+  kind?: string; // "core" | "function" | "employee"
+  status?: string; // "active" | "idle" | "retired"
   description?: string;
   path?: string;
   // Employee-only (ADR-017): the exec that spun it up + the template it came from.
   reports_to?: string;
   template?: string;
+  // Optional per-employee model override (ADR-020 §D: escalate per employee, not per
+  // template). Present only when an instance overrides its template's default_model.
+  default_model?: string;
 };
 
 export type EmployeeTemplate = {
@@ -24,6 +30,9 @@ export type EmployeeTemplate = {
   kind?: string; // "template"
   status?: string;
   description?: string;
+  // ADR-020 §D: the executive this template hangs under, so the org view can group the
+  // per-exec summon catalog ("the types of employees I can summon").
+  owner_agent?: string;
   default_model?: string;
   skills?: string[];
   path?: string;
