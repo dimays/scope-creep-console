@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
-import { Form, Link, redirect, useNavigation } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Form, Link, redirect, useNavigation, useRevalidator } from "react-router";
 import { ResumePanel, ThreadLauncher } from "~/components/thread-launcher";
 import type { ProjectedTurn } from "~/lib/claude-sessions";
 import { resolveThreadProjection } from "~/lib/claude-sessions.server";
@@ -112,6 +112,38 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
   const launched = projection.status !== "not-launched";
   const seed = messages.find((m) => m.role === "owner" && m.type === "message")?.body ?? "";
 
+  // Bug-2 fix (ADR-013 decision-2): short-poll revalidation so a launched thread's projected
+  // transcript, turn count, and status refresh on their own while the Claude Code session
+  // streams new turns — no manual reload. It re-runs the loader, which re-reads the local
+  // JSONL: still zero Claude calls (ADR-016). Polls ONLY while a launched thread isn't closed
+  // (a closed thread is done — no needless polling), and stops on unmount. A ref holds the
+  // latest revalidator so the interval survives state flips without being torn down each tick.
+  const shouldPoll = launched && status !== "closed";
+  const revalidator = useRevalidator();
+  const revalidatorRef = useRef(revalidator);
+  revalidatorRef.current = revalidator;
+  useEffect(() => {
+    if (!shouldPoll) return;
+    const id = setInterval(() => {
+      const r = revalidatorRef.current;
+      if (r.state === "idle") r.revalidate(); // don't stack requests
+    }, 3000);
+    return () => clearInterval(id);
+  }, [shouldPoll]);
+
+  // Nice-to-have: when new turns arrive (poll picked them up), auto-scroll to the newest so the
+  // latest reply is visible in a long transcript (thread 7 has ~278 turns). Never scrolls on the
+  // first render — only when the count grows — so opening a thread doesn't jump the viewport.
+  const turnCount = projection.status === "matched" ? projection.turns.length : 0;
+  const endRef = useRef<HTMLDivElement>(null);
+  const prevTurnCount = useRef(turnCount);
+  useEffect(() => {
+    if (turnCount > prevTurnCount.current) {
+      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+    prevTurnCount.current = turnCount;
+  }, [turnCount]);
+
   return (
     <main className="console">
       <header className="console__header">
@@ -171,7 +203,11 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
             </p>
             {projection.status === "matched" ? (
               projection.turns.length > 0 ? (
-                <Transcript turns={projection.turns} />
+                <>
+                  <Transcript turns={projection.turns} />
+                  {/* Auto-scroll target: the newest turn (see the turn-count effect above). */}
+                  <div ref={endRef} aria-hidden="true" />
+                </>
               ) : (
                 <p className="console__empty">
                   The session exists but has no turns yet. Empty is empty.
