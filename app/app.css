@@ -1608,3 +1608,182 @@ a.org__tpl {
   font-size: 0.75rem;
   line-height: 1.5;
 }
+
+/* Archive / restore threads (work-049) ------------------------------------------------ */
+
+/* The thread-detail header cluster: status tag + the Archive control, aligned right. */
+.thread-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* "Archive thread" — a quiet, clearly-labeled control (it opens the confirm gate). It reads
+   as secondary until hover, so it never competes with the conversation itself. */
+.thread-archive-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-muted);
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  transition:
+    color var(--sc-motion) var(--sc-ease),
+    border-color var(--sc-motion) var(--sc-ease),
+    background var(--sc-motion) var(--sc-ease);
+}
+
+.thread-archive-btn:hover {
+  color: var(--sc-text);
+  border-color: var(--sc-muted);
+  background: color-mix(in srgb, var(--sc-muted) 8%, transparent);
+}
+
+/* Threads header: meta line + the Archive link sit together on the right. */
+.threads-header-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.threads-archive-link {
+  color: var(--sc-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color var(--sc-motion) var(--sc-ease);
+}
+
+.threads-archive-link:hover {
+  color: var(--sc-accent);
+}
+
+/* An archived-thread row carries a Restore action on the right; the title stays muted so the
+   view reads as "put away, retrievable" rather than active. */
+.thread-row--archived .thread-row__title {
+  color: var(--sc-muted);
+}
+
+.thread-row__restore {
+  flex: none;
+  margin: 0;
+}
+
+.thread-restore-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-accent);
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  transition:
+    border-color var(--sc-motion) var(--sc-ease),
+    background var(--sc-motion) var(--sc-ease);
+}
+
+.thread-restore-btn:hover {
+  border-color: var(--sc-accent);
+  background: color-mix(in srgb, var(--sc-accent) 10%, transparent);
+}
+
+.thread-restore-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* The confirm modal (work-049) — a focus-trapped, accessible dialog. Owned here for now;
+   a candidate to promote into @scope-creep/design as a shared primitive. */
+.modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--sc-text) 45%, transparent);
+  animation: sc-modal-fade var(--sc-motion) var(--sc-ease);
+}
+
+.modal {
+  position: relative;
+  z-index: 1;
+  width: min(28rem, 100%);
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--sc-text) 22%, transparent);
+  padding: 1.4rem 1.4rem 1.2rem;
+  /* Delight in the 200ms nobody budgets for — a gentle rise-in. Stilled under
+     prefers-reduced-motion by the central motion-token contract (work-041). */
+  animation: sc-modal-rise var(--sc-motion) var(--sc-ease);
+}
+
+.modal__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.modal__desc {
+  margin: 0 0 1.2rem;
+  color: var(--sc-muted);
+  line-height: 1.5;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.modal__confirm-form {
+  margin: 0;
+}
+
+.modal__cancel {
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-text);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  transition:
+    border-color var(--sc-motion) var(--sc-ease),
+    background var(--sc-motion) var(--sc-ease);
+}
+
+.modal__cancel:hover {
+  border-color: var(--sc-muted);
+  background: color-mix(in srgb, var(--sc-muted) 8%, transparent);
+}
+
+/* The confirm button reuses the primary submit vocabulary (req-submit) via className. */
+
+@keyframes sc-modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sc-modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}

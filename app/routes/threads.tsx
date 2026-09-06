@@ -2,7 +2,7 @@ import { StatusDot } from "@scope-creep/design";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { SubmitButton } from "~/components/state";
 import { groupThreads, type Thread, type ThreadInitiator, type ThreadStatus } from "~/lib/threads";
-import { createThread, listThreads } from "~/lib/threads.server";
+import { createThread, listArchivedThreads, listThreads } from "~/lib/threads.server";
 import type { Route } from "./+types/threads";
 
 export function meta(_: Route.MetaArgs) {
@@ -18,7 +18,10 @@ const TURN: Record<ThreadStatus, string> = {
 };
 
 export async function loader(_: Route.LoaderArgs) {
-  return { threads: await listThreads() };
+  // The main list excludes archived threads (work-049); we surface a count so the Archive
+  // link only appears once there's something in it.
+  const [threads, archived] = await Promise.all([listThreads(), listArchivedThreads()]);
+  return { threads, archivedCount: archived.length };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -35,7 +38,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Threads({ loaderData }: Route.ComponentProps) {
-  const { threads } = loaderData;
+  const { threads, archivedCount } = loaderData;
   const nav = useNavigation();
   const opening = nav.state !== "idle" && nav.formMethod === "POST";
   // One derivation, shared with the home badge: threads parked on the Owner surface first.
@@ -48,7 +51,12 @@ export default function Threads({ loaderData }: Route.ComponentProps) {
           <p className="console__eyebrow">Scope Creep</p>
           <h1 className="console__title">Threads</h1>
         </div>
-        <p className="console__meta">one conversation with your Chief of Staff · work-029</p>
+        <div className="threads-header-meta">
+          <p className="console__meta">one conversation with your Chief of Staff · work-029</p>
+          <Link to="/threads/archive" className="threads-archive-link">
+            Archive{archivedCount > 0 ? ` (${archivedCount})` : ""} →
+          </Link>
+        </div>
       </header>
 
       <Form method="post" className="req-form">

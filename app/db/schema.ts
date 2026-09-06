@@ -45,6 +45,11 @@ export type Feedback = typeof feedback.$inferSelect;
  * `parentId`, and a typed `branch` card is dropped in the parent at the split point, so the
  * two threads are linked both ways with no reshape. Both columns are nullable — a plain
  * (non-branched) thread leaves them null.
+ *
+ * Archive (work-049): `archivedAt` is a nullable timestamp that is **orthogonal to
+ * `status`** — a thread may be open or closed *and* archived. Archiving stamps it (the
+ * thread then leaves the main Threads UI and its groupings); restoring clears it back to
+ * null (the thread returns to the main list). Reversible throughout — no data is destroyed.
  */
 export const conversations = sqliteTable("conversations", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -54,6 +59,9 @@ export const conversations = sqliteTable("conversations", {
   initiator: text("initiator").notNull().default("owner"),
   parentId: integer("parent_id"),
   branchedFromMessageId: integer("branched_from_message_id"),
+  // Archive (work-049): non-null once archived (leaves the main list, shows in /threads/archive);
+  // cleared on restore. Orthogonal to `status`; nullable — a live thread leaves it null.
+  archivedAt: integer("archived_at"),
   // Threads launcher (work-046/047, ADR-016): when the Owner launches a thread into a
   // Claude Code session, `launchedAt` marks the moment (and flips the in-app input to a
   // "Resume in Claude" control). `sessionUuid`/`sessionPath` are the correlated local

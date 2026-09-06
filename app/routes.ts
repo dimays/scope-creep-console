@@ -6,6 +6,8 @@ export default [
   route("feedback", "routes/feedback.tsx"),
   // CoS-Threads (work-029, ADR-012): the unified, top-level human-input surface.
   route("threads", "routes/threads.tsx"),
+  // The Archive view (work-049) — static segment before `:id` so it isn't shadowed.
+  route("threads/archive", "routes/threads-archive.tsx"),
   route("threads/:id", "routes/thread.tsx"),
   // Live agent-chat resource + chatbot preview/merge flow (unchanged; ChatMount posts here).
   route("chat/send", "routes/chat-send.tsx"),

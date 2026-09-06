@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations } from "~/db/schema";
 import type { BranchLink, MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
@@ -22,10 +22,59 @@ export type {
   ThreadStatus,
 } from "./threads";
 
-/** All threads, most-recently-updated first (both `chat` and `request` kinds). */
+/**
+ * All **non-archived** threads, most-recently-updated first (both `chat` and `request`
+ * kinds). Archived threads (work-049) are excluded by default so they leave the main
+ * Threads UI, its groupings, and the home "waiting on you" badge; list them with
+ * {@link listArchivedThreads}.
+ */
 export async function listThreads(): Promise<Thread[]> {
   await ensureSchema();
-  return db.select().from(conversations).orderBy(desc(conversations.updatedAt));
+  return db
+    .select()
+    .from(conversations)
+    .where(isNull(conversations.archivedAt))
+    .orderBy(desc(conversations.updatedAt));
+}
+
+/**
+ * The **archived** threads (work-049), most-recently-updated first — the backing query for
+ * the Archive view. Each can be restored (see {@link restoreThread}) back to the main list.
+ */
+export async function listArchivedThreads(): Promise<Thread[]> {
+  await ensureSchema();
+  return db
+    .select()
+    .from(conversations)
+    .where(isNotNull(conversations.archivedAt))
+    .orderBy(desc(conversations.updatedAt));
+}
+
+/**
+ * Archive a thread (work-049): stamp `archivedAt` so it leaves the main Threads UI and all
+ * its groupings. Orthogonal to `status` — the thread's open/closed lifecycle is untouched, so
+ * restoring returns it exactly as it was. Reversible; no data is destroyed. Touches
+ * `updatedAt` so it sorts to the top of the Archive view.
+ */
+export async function archiveThread(threadId: number): Promise<void> {
+  await ensureSchema();
+  const now = Date.now();
+  await db
+    .update(conversations)
+    .set({ archivedAt: now, updatedAt: now })
+    .where(eq(conversations.id, threadId));
+}
+
+/**
+ * Restore an archived thread (work-049): clear `archivedAt` so it returns to the main list
+ * in its prior lifecycle state. The inverse of {@link archiveThread}; needs no confirm.
+ */
+export async function restoreThread(threadId: number): Promise<void> {
+  await ensureSchema();
+  await db
+    .update(conversations)
+    .set({ archivedAt: null, updatedAt: Date.now() })
+    .where(eq(conversations.id, threadId));
 }
 
 /**

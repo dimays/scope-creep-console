@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, redirect, useNavigation, useRevalidator } from "react-router";
+import { ConfirmDialog } from "~/components/confirm-dialog";
+import { SubmitButton } from "~/components/state";
 import { ResumePanel, ThreadLauncher } from "~/components/thread-launcher";
 import type { ProjectedTurn } from "~/lib/claude-sessions";
 import { resolveThreadProjection } from "~/lib/claude-sessions.server";
@@ -13,6 +15,7 @@ import {
 } from "~/lib/threads";
 import {
   addMessage,
+  archiveThread,
   branchThread,
   firstOwnerBody,
   getThread,
@@ -63,6 +66,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!body) return { ok: false };
     await launchThread(id, body);
     return redirect(`/threads/${id}`);
+  }
+
+  // Archive this thread (work-049): stamp `archivedAt` so it leaves the main Threads UI, then
+  // land on /threads (where it's now gone — it lives in the Archive view). Reversible via
+  // Restore. Orthogonal to status; the confirm gate happens in-app before this POSTs.
+  if (intent === "archive") {
+    await archiveThread(id);
+    return redirect("/threads");
   }
 
   // Branch a tangent into a linked child thread (work-032), then land on the child.
@@ -166,7 +177,10 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
             </p>
           ) : null}
         </div>
-        <span className={`tag thread-status--${status}`}>{TURN[status] ?? status}</span>
+        <div className="thread-header-actions">
+          <span className={`tag thread-status--${status}`}>{TURN[status] ?? status}</span>
+          <ArchiveThread />
+        </div>
       </header>
 
       <div className="thread">
@@ -342,6 +356,45 @@ function BranchForm({ lastMessageId }: { lastMessageId: number | null }) {
         </button>
       </div>
     </Form>
+  );
+}
+
+/**
+ * Archive this thread (work-049): one clear button that opens a tasteful, focus-trapped
+ * confirm gate (the Owner's one deliberate validation — never `window.confirm`). Confirming
+ * POSTs the `archive` intent; the thread then leaves the main Threads UI and lives in the
+ * Archive, restorable anytime.
+ */
+function ArchiveThread() {
+  const [open, setOpen] = useState(false);
+  const nav = useNavigation();
+  const archiving = nav.state !== "idle" && nav.formData?.get("intent") === "archive";
+
+  return (
+    <>
+      <button
+        type="button"
+        className="thread-archive-btn"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+      >
+        Archive thread
+      </button>
+      {open ? (
+        <ConfirmDialog
+          title="Archive this thread?"
+          description="It moves to the Archive — you can restore it anytime."
+          onCancel={() => setOpen(false)}
+        >
+          <Form method="post" className="modal__confirm-form">
+            <input type="hidden" name="intent" value="archive" />
+            <SubmitButton pending={archiving} pendingLabel="Archiving…">
+              Archive
+            </SubmitButton>
+          </Form>
+        </ConfirmDialog>
+      ) : null}
+    </>
   );
 }
 
