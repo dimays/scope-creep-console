@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { db, ensureSchema } from "~/db";
-import { conversationMessages, feedback, requestMessages } from "~/db/schema";
+import { conversationMessages, conversations, feedback } from "~/db/schema";
 import { type HumanInputEvent, type SpineItem, truncate } from "./human-input";
 
 export type {
@@ -15,55 +15,48 @@ export type {
 } from "./human-input";
 
 /**
- * The Human-Input Log (ADR-010): a generated PROJECTION that owns no data. v1a unions
- * the three already-captured Owner-input sources in the Console DB, and derives the
- * "work between inputs" (interludes) from the control-plane git history. Terminal
- * (operator-session) + gate (owner-action) capture arrive in work-020.
+ * The Human-Input Log (ADR-010): a generated PROJECTION that owns no data. It unions the
+ * captured Owner-input sources and derives the "work between inputs" (interludes) from
+ * the control-plane git history. Since CoS-Threads (work-029, ADR-012) unified Chat +
+ * Requests onto the one conversation primitive, Owner messages come from a **single**
+ * source — `conversation_messages` where `role = owner` — and the per-input source/intent
+ * is derived from the parent thread's `kind` (a `chat` thread → directive; a `request`
+ * thread → its first owner message is the ask, later ones are replies). This is the
+ * simplification ADR-012 promised over the old two-source (chat + requests) union.
  */
 
 export async function listHumanInput(): Promise<HumanInputEvent[]> {
   await ensureSchema();
-  const [chats, reqMsgs, fbs, operatorEvents] = await Promise.all([
+  const [convos, convMsgs, fbs, operatorEvents] = await Promise.all([
+    db.select().from(conversations),
     db.select().from(conversationMessages),
-    db.select().from(requestMessages),
     db.select().from(feedback),
     readOperatorSessions(),
   ]);
 
   const events: HumanInputEvent[] = [...operatorEvents];
 
-  for (const m of chats) {
+  // One owner-message source; tag each by its thread's kind.
+  const kindById = new Map(convos.map((c) => [c.id, c.kind]));
+  const ownerByThread = new Map<number, typeof convMsgs>();
+  for (const m of convMsgs) {
     if (m.role !== "owner") continue;
-    events.push({
-      id: `chat:${m.id}`,
-      ts: m.at,
-      source: "console-chat",
-      intent: "directive",
-      summary: truncate(m.body),
-      excerpt: m.body,
-      refUrl: "/chat",
-    });
+    const arr = ownerByThread.get(m.conversationId) ?? [];
+    arr.push(m);
+    ownerByThread.set(m.conversationId, arr);
   }
-
-  // Group a request's owner messages: the first is the ask, later ones are replies.
-  const byReq = new Map<number, typeof reqMsgs>();
-  for (const rm of reqMsgs) {
-    if (rm.author !== "owner") continue;
-    const arr = byReq.get(rm.requestId) ?? [];
-    arr.push(rm);
-    byReq.set(rm.requestId, arr);
-  }
-  for (const [reqId, arr] of byReq) {
+  for (const [threadId, arr] of ownerByThread) {
+    const isRequest = kindById.get(threadId) === "request";
     arr.sort((a, b) => a.at - b.at);
-    arr.forEach((rm, i) => {
+    arr.forEach((m, i) => {
       events.push({
-        id: `req:${rm.id}`,
-        ts: rm.at,
-        source: i === 0 ? "work-request" : "request-reply",
-        intent: i === 0 ? "request" : "answer",
-        summary: truncate(rm.body),
-        excerpt: rm.body,
-        refUrl: `/work/requests/${reqId}`,
+        id: `conv:${m.id}`,
+        ts: m.at,
+        source: isRequest ? (i === 0 ? "work-request" : "request-reply") : "console-chat",
+        intent: isRequest ? (i === 0 ? "request" : "answer") : "directive",
+        summary: truncate(m.body),
+        excerpt: m.body,
+        refUrl: `/threads/${threadId}`,
       });
     });
   }
