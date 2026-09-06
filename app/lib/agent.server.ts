@@ -48,9 +48,20 @@ function anthropicHeaders(key: string): Record<string, string> {
   };
 }
 
-const MODEL = () => process.env.CHAT_MODEL ?? "claude-sonnet-5";
+/**
+ * The model for a turn (work-018). Callers resolve the effective model — the Owner's
+ * persisted pick, or an agent's per-task choice, validated against `models.json` — and
+ * pass it in. When omitted (e.g. legacy callers/tests) we fall back to the `CHAT_MODEL`
+ * env default, then the hardcoded floor. Resolution/validation lives in `models*.ts`;
+ * this module never invents an id.
+ */
+const MODEL = (model?: string) => model ?? process.env.CHAT_MODEL ?? "claude-sonnet-5";
 
-export async function agentRespond(history: AgentMessage[], userText: string): Promise<string> {
+export async function agentRespond(
+  history: AgentMessage[],
+  userText: string,
+  opts: { model?: string } = {},
+): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return fallbackReply(userText);
 
@@ -59,7 +70,7 @@ export async function agentRespond(history: AgentMessage[], userText: string): P
       method: "POST",
       headers: anthropicHeaders(key),
       body: JSON.stringify({
-        model: MODEL(),
+        model: MODEL(opts.model),
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: toAnthropicMessages(history, userText),
@@ -89,6 +100,7 @@ export async function agentRespond(history: AgentMessage[], userText: string): P
 export async function* agentRespondStream(
   history: AgentMessage[],
   userText: string,
+  opts: { model?: string } = {},
 ): AsyncGenerator<string, void, unknown> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
@@ -102,7 +114,7 @@ export async function* agentRespondStream(
       method: "POST",
       headers: anthropicHeaders(key),
       body: JSON.stringify({
-        model: MODEL(),
+        model: MODEL(opts.model),
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: toAnthropicMessages(history, userText),

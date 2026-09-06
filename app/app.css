@@ -77,6 +77,11 @@ body {
   color: var(--sc-muted);
 }
 
+.console__notice--error {
+  border-left-color: var(--sc-danger, #c0392b);
+  color: var(--sc-text, inherit);
+}
+
 .console__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

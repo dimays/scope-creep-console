@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations } from "~/db/schema";
 import { type AgentMessage, agentRespondStream } from "./agent.server";
+import { effectiveChatModel } from "./models.server";
 import type { MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
 
 /**
@@ -116,8 +117,9 @@ export async function* threadReplyStream(
   await ensureSchema();
   const history = await threadHistory(threadId);
   await addMessage(threadId, "owner", userText); // persists + flips turn to `working`
+  const model = await effectiveChatModel();
   let full = "";
-  for await (const delta of agentRespondStream(history, userText)) {
+  for await (const delta of agentRespondStream(history, userText, { model })) {
     full += delta;
     yield delta;
   }
