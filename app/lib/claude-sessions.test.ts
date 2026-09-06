@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCliCommand,
   buildDeepLink,
+  buildOpenRepoLink,
   buildResumeCommand,
   buildSeedPrompt,
   claudeProjectDirName,
@@ -47,13 +48,29 @@ describe("thread ↔ session correlation markers (work-046)", () => {
 });
 
 describe("launch URLs + fallback command (work-046)", () => {
-  it("buildDeepLink URL-encodes cwd and the seeded prompt", () => {
+  it("buildDeepLink opens a new Claude Code session with folder + prompt, both encoded", () => {
     const url = buildDeepLink({ cwd: "/Users/x/code/scope-creep", prompt: "hi there & bye" });
-    expect(url.startsWith("claude-cli://open?cwd=")).toBe(true);
-    expect(url).toContain(encodeURIComponent("/Users/x/code/scope-creep"));
-    expect(url).toContain(encodeURIComponent("hi there & bye"));
+    // Claude Desktop scheme (the one actually registered), new-session route.
+    expect(url.startsWith("claude://code/new?q=")).toBe(true);
+    expect(url).toContain(`folder=${encodeURIComponent("/Users/x/code/scope-creep")}`);
+    expect(url).toContain(`q=${encodeURIComponent("hi there & bye")}`);
     // No raw ampersand from the prompt leaking a spurious query param.
-    expect(url.split("&").length).toBe(2); // exactly cwd=… & q=…
+    expect(url.split("&").length).toBe(2); // exactly q=… & folder=…
+  });
+
+  it("buildDeepLink preserves the thread marker inside q (work-047 correlation)", () => {
+    const seed = buildSeedPrompt(7, "Give me a State of the Product.");
+    const url = buildDeepLink({ cwd: "/Users/x/code/scope-creep", prompt: seed });
+    // The marker survives url-encoding inside q so the transcript correlator can resolve it.
+    expect(url).toContain(encodeURIComponent(threadMarker(7)));
+    const q = new URL(url).searchParams.get("q");
+    expect(q).toContain(threadMarker(7));
+  });
+
+  it("buildOpenRepoLink opens a new session in the folder with no seed", () => {
+    const url = buildOpenRepoLink("/Users/x/code/scope-creep");
+    expect(url).toBe(`claude://code/new?folder=${encodeURIComponent("/Users/x/code/scope-creep")}`);
+    expect(url).not.toContain("q=");
   });
 
   it("buildCliCommand escapes quotes so it is paste-safe", () => {

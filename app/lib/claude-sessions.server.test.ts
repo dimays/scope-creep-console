@@ -78,7 +78,9 @@ describe("resolveThreadProjection (orchestration)", () => {
     );
     expect(p.status).toBe("not-launched");
     expect(p.turns).toEqual([]);
-    expect(p.deepLink).toContain("claude-cli://open?cwd=");
+    expect(p.deepLink).toContain("claude://code/new?q=");
+    expect(p.deepLink).toContain(`folder=${encodeURIComponent(CWD)}`);
+    // The correlation marker survives into q so work-047 can resolve the resulting session.
     expect(p.deepLink).toContain(encodeURIComponent("[scope-creep-thread:7]"));
     expect(typeof p.schemeRegistered).toBe("boolean");
   });

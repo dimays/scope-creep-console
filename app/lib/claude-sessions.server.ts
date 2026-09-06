@@ -55,17 +55,21 @@ function projectDir(cwd = controlPlaneHome()): string {
 let schemeCache: boolean | undefined;
 
 /**
- * Is the `claude-cli:` URL scheme registered with the OS? (work-046 live-check.) We use a
- * **side-effect-free** LaunchServices query (`lsregister -dump | grep claude-cli:`) rather
- * than `open`, because `open` would *launch* the app on a hit. macOS only; anything else
- * (or any failure) is reported as "not registered" so the UI shows the honest fallback
- * (the copyable `claude "…"` command) instead of claiming a launch it can't guarantee.
- * Cached for the process — registration doesn't change mid-run.
+ * Is the `claude:` (Claude Desktop) URL scheme registered with the OS? (work-046 live-check.)
+ * This is the scheme that hosts Claude Code on the Owner's machine — Claude Code runs embedded
+ * in Claude Desktop, so `claude-cli:` (a standalone-binary scheme) is *not* registered here,
+ * but `claude:` is. We use a **side-effect-free** LaunchServices query
+ * (`lsregister -dump`, matched for a registered `claude:` scheme) rather than `open`, because
+ * `open` would *launch* the app on a hit. The pattern `claude:` matches the Desktop scheme
+ * without matching `claude-cli:` (whose next char is `-`, not `:`). macOS only; anything else
+ * (or any failure) is reported as "not registered" so the UI shows the honest fallback (the
+ * copyable command) instead of claiming a launch it can't guarantee. Cached for the process —
+ * registration doesn't change mid-run.
  *
- * `SC_CLAUDE_CLI_SCHEME=1|0` overrides the probe. This matters for a **deployed** (Linux)
- * Console: the server runs on a different host than the Owner's Mac and can't probe it, so
- * the Owner can declare "the scheme works in my browser" (`=1`) or force the copyable
- * fallback (`=0`). It also keeps tests deterministic and fast.
+ * `SC_CLAUDE_CLI_SCHEME=1|0` overrides the probe (name kept for continuity). This matters for a
+ * **deployed** (Linux) Console: the server runs on a different host than the Owner's Mac and
+ * can't probe it, so the Owner can declare "the scheme works in my browser" (`=1`) or force the
+ * copyable fallback (`=0`). It also keeps tests deterministic and fast.
  */
 export async function verifyClaudeCliScheme(): Promise<boolean> {
   if (schemeCache !== undefined) return schemeCache;
@@ -82,7 +86,10 @@ export async function verifyClaudeCliScheme(): Promise<boolean> {
     "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister";
   try {
     const { stdout } = await exec(lsregister, ["-dump"], { maxBuffer: 64 * 1024 * 1024 });
-    schemeCache = /claude-cli:/.test(stdout);
+    // `claude:` = Claude Desktop's scheme; the negative lookahead rejects `claude-cli:`
+    // and `claudecode:`-style neighbors (verified against the live lsregister dump, where
+    // it appears as a bare `claude:` and as `claude:,` in a scheme list).
+    schemeCache = /claude:(?![-\w])/.test(stdout);
   } catch {
     schemeCache = false;
   }
