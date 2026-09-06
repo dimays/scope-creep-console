@@ -34,13 +34,17 @@ export type Feedback = typeof feedback.$inferSelect;
  * CoS-Threads (ADR-012). `kind` distinguishes uses (`chat`, `request`, …); `status`
  * carries the thread lifecycle/turn — `open → (needs-you | working) → closed` — so
  * "whose turn is it" is a stored field, not derived (the native fix for the work-011
- * Requests bug).
+ * Requests bug). `initiator` records who opened the thread — the Owner (default) or the
+ * `org` when the Chief of Staff opens one to get the Owner's input (work-030). It's
+ * additive: an org opener is an `agent` message, so it never enters the Human-Input Log
+ * (which unions only `role = owner`).
  */
 export const conversations = sqliteTable("conversations", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   kind: text("kind").notNull(),
   title: text("title").notNull().default(""),
   status: text("status").notNull().default("open"),
+  initiator: text("initiator").notNull().default("owner"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

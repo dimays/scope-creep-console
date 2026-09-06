@@ -1,0 +1,1 @@
+ALTER TABLE `conversations` ADD `initiator` text DEFAULT 'owner' NOT NULL;

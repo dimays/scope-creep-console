@@ -1,7 +1,12 @@
 import { Link } from "react-router";
 import { InProgress } from "~/components/state";
 import { ThreadReply } from "~/components/thread-reply";
-import { parseMeta, type ThreadMessage, type ThreadStatus } from "~/lib/threads";
+import {
+  parseMeta,
+  type ThreadInitiator,
+  type ThreadMessage,
+  type ThreadStatus,
+} from "~/lib/threads";
 import { addMessage, getThread } from "~/lib/threads.server";
 import type { Route } from "./+types/thread";
 
@@ -49,6 +54,7 @@ function authorLabel(msg: ThreadMessage): string {
 export default function Thread({ loaderData }: Route.ComponentProps) {
   const { thread, messages } = loaderData;
   const status = thread.status as ThreadStatus;
+  const orgInitiated = (thread.initiator as ThreadInitiator) === "org";
 
   return (
     <main className="console">
@@ -59,6 +65,7 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
               Threads
             </Link>{" "}
             · {thread.kind}
+            {orgInitiated ? " · CoS opened this" : null}
           </p>
           <h1 className="console__title">{thread.title || "Untitled thread"}</h1>
         </div>
@@ -77,6 +84,13 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           ),
         )}
       </div>
+
+      {status === "needs-you" ? (
+        <p className="console__notice thread-needs-you">
+          This thread is waiting on you{orgInitiated ? " — the Chief of Staff opened it" : ""}.
+          Reply below to hand the turn back to the org.
+        </p>
+      ) : null}
 
       {status === "working" ? (
         <p className="console__notice thread-working">
