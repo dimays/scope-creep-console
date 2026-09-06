@@ -45,11 +45,6 @@ function claudeProjectsRoot(): string {
   return process.env.CLAUDE_PROJECTS_DIR ?? join(homedir(), ".claude", "projects");
 }
 
-/** The project dir holding sessions for the control-plane cwd. */
-function projectDir(cwd = controlPlaneHome()): string {
-  return join(claudeProjectsRoot(), claudeProjectDirName(cwd));
-}
-
 // ---- URL-scheme verification (honest launcher) ------------------------------------------
 
 let schemeCache: boolean | undefined;
@@ -106,34 +101,49 @@ export function __resetSchemeCache(): void {
 export type SessionMatch = { uuid: string; path: string };
 
 /**
- * Find the local Claude Code session correlated to a thread by its marker. Scans the
- * control-plane project dir's `*.jsonl` files and returns the first whose opening Owner
- * message carries `threadMarker(threadId)`. Best-effort: a missing dir (no sessions yet,
- * or Claude Code never run here) yields null, never throws. Only the first Owner message
- * of each file is scanned (early-exit), so large transcripts aren't fully parsed.
+ * Find the local Claude Code session correlated to a thread by its marker. The marker is
+ * globally unique per thread, so we scan **every** `~/.claude/projects/<dir>/*.jsonl` — not
+ * just the control-plane project dir — because a launched session can land in a *different*
+ * repo's project dir when the deep-link `folder` param doesn't take (Claude Desktop opens
+ * Code in its already-active folder). `cwd` only sets the *preferred* dir to check first (the
+ * common case + a bounded fast path); the search is not restricted to it. Best-effort: a
+ * missing root/dir/file is skipped, never throws.
  */
 export async function findSessionForThread(
   threadId: number,
   cwd = controlPlaneHome(),
 ): Promise<SessionMatch | null> {
-  const dir = projectDir(cwd);
+  const root = claudeProjectsRoot();
   const marker = threadMarker(threadId);
-  let files: string[];
+  const preferred = claudeProjectDirName(cwd);
+  let dirNames: string[];
   try {
-    files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
+    dirNames = (await readdir(root, { withFileTypes: true }))
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
   } catch {
     return null;
   }
-  // Newest file first: a fresh launch is the likeliest match, and it bounds the scan.
-  const withPaths = files.map((f) => ({ uuid: f.replace(/\.jsonl$/, ""), path: join(dir, f) }));
-  for (const { uuid, path } of withPaths) {
-    let raw: string;
+  // Preferred (control-plane) dir first, then the rest — a cross-repo match is valid.
+  dirNames.sort((a, b) => (a === preferred ? -1 : b === preferred ? 1 : 0));
+  for (const name of dirNames) {
+    const dir = join(root, name);
+    let files: string[];
     try {
-      raw = await readFile(path, "utf8");
+      files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
     } catch {
       continue;
     }
-    if (sessionMatchesMarker(raw, marker)) return { uuid, path };
+    for (const f of files) {
+      const path = join(dir, f);
+      let raw: string;
+      try {
+        raw = await readFile(path, "utf8");
+      } catch {
+        continue;
+      }
+      if (sessionMatchesMarker(raw, marker)) return { uuid: f.replace(/\.jsonl$/, ""), path };
+    }
   }
   return null;
 }

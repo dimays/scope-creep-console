@@ -52,8 +52,29 @@ describe("findSessionForThread (correlation by marker)", () => {
     expect(await findSessionForThread(1234, CWD)).toBeNull();
   });
 
-  it("returns null (never throws) when the project dir does not exist", async () => {
-    expect(await findSessionForThread(7, "/no/such/repo/anywhere")).toBeNull();
+  it("finds a session that landed in a DIFFERENT project dir (folder param didn't take)", async () => {
+    // The real dogfood bug: the launched session opened in the console repo's project dir,
+    // not the control-plane one. Correlation by the (globally-unique) marker must still find it.
+    const otherDir = join(root, claudeProjectDirName("/Users/test/code/scope-creep-console"));
+    mkdirSync(otherDir, { recursive: true });
+    const otherUuid = "99999999-8888-7777-6666-555555555555";
+    writeFileSync(
+      join(otherDir, `${otherUuid}.jsonl`),
+      '{"type":"user","isSidechain":false,"message":{"role":"user","content":"do a thing [scope-creep-thread:8]"},"timestamp":"2026-09-06T00:00:00.000Z"}\n',
+      "utf8",
+    );
+    const match = await findSessionForThread(8, CWD);
+    expect(match?.uuid).toBe(otherUuid);
+  });
+
+  it("returns null (never throws) when the projects root does not exist", async () => {
+    const prev = process.env.CLAUDE_PROJECTS_DIR;
+    process.env.CLAUDE_PROJECTS_DIR = "/no/such/projects/root/anywhere";
+    try {
+      expect(await findSessionForThread(7, CWD)).toBeNull();
+    } finally {
+      process.env.CLAUDE_PROJECTS_DIR = prev;
+    }
   });
 });
 
