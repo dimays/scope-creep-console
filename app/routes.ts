@@ -9,15 +9,9 @@ export default [
   // The Archive view (work-049) — static segment before `:id` so it isn't shadowed.
   route("threads/archive", "routes/threads-archive.tsx"),
   route("threads/:id", "routes/thread.tsx"),
-  // Live agent-chat resource + chatbot preview/merge flow (unchanged; ChatMount posts here).
-  route("chat/send", "routes/chat-send.tsx"),
-  route("chat/propose", "routes/chat-propose.tsx"),
-  route("chat/preview", "routes/chat-preview.tsx"),
-  route("chat/land", "routes/chat-land.tsx"),
-  route("chat/decline", "routes/chat-decline.tsx"),
-  // Flagship (work-017): describe a change → agent-drafted, isolated diff → gated PR.
-  route("propose", "routes/propose.tsx"),
-  // Legacy redirect → Threads (old top-level Chat tab).
+  // Legacy redirect → Threads (old top-level Chat tab). The in-app agent-chat runtime and
+  // the Propose surface it backed were retired per ADR-019; this bare redirect stays so old
+  // /chat links don't 404.
   route("chat", "routes/chat.tsx"),
   route("explore", "routes/explore.tsx"),
   route("explore/docs", "routes/explore-docs.tsx"),

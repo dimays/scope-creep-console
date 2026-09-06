@@ -41,9 +41,6 @@ function TopNav() {
       <NavLink to="/threads" className={linkClass}>
         Threads
       </NavLink>
-      <NavLink to="/propose" className={linkClass}>
-        Propose
-      </NavLink>
       <NavLink to="/settings" className={linkClass}>
         Settings
       </NavLink>
