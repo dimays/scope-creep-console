@@ -36,6 +36,13 @@
       "when": 1788718318375,
       "tag": "0004_wealthy_starhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788721734987,
+      "tag": "0005_late_madrox",
+      "breakpoints": true
     }
   ]
 }

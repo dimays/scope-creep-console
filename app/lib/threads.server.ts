@@ -280,6 +280,60 @@ export async function addMessage(
   await db.update(conversations).set(patch).where(eq(conversations.id, threadId));
 }
 
+/**
+ * Launch a thread into a Claude Code session (work-046, ADR-016). Records the Owner's seed
+ * text as an owner message (unless it's identical to the thread's current last owner
+ * message — the common "launch the opener as typed" case, which must not duplicate it),
+ * then stamps `launchedAt` and flips the turn to `working`. The actual OS launch (firing
+ * the `claude-cli:` deep link, or the copyable fallback command) happens on the client /
+ * by the Owner — this layer never calls Claude. Correlation to the resulting session JSONL
+ * is by marker (see claude-sessions.server); the resolved path is persisted by
+ * {@link linkThreadSession}. Returns the seed text actually used.
+ */
+export async function launchThread(threadId: number, seedText: string): Promise<string> {
+  await ensureSchema();
+  const clean = seedText.trim();
+  const rows = await db
+    .select()
+    .from(conversationMessages)
+    .where(eq(conversationMessages.conversationId, threadId))
+    .orderBy(conversationMessages.at);
+  const lastOwner = [...rows].reverse().find((r) => r.role === "owner" && r.type === "message");
+  if (clean && clean !== (lastOwner?.body ?? "")) {
+    await addMessage(threadId, "owner", clean); // flips turn → working, touches updatedAt
+  }
+  const now = Date.now();
+  await db
+    .update(conversations)
+    .set({ launchedAt: now, status: "working", updatedAt: now })
+    .where(eq(conversations.id, threadId));
+  return clean || (lastOwner?.body ?? "");
+}
+
+/** Persist the correlated Claude Code session on a thread once resolved by marker (work-047). */
+export async function linkThreadSession(
+  threadId: number,
+  sessionUuid: string,
+  sessionPath: string,
+): Promise<void> {
+  await ensureSchema();
+  await db
+    .update(conversations)
+    .set({ sessionUuid, sessionPath })
+    .where(eq(conversations.id, threadId));
+}
+
+/** The thread's first Owner-authored message body — the canonical seed for the launcher. */
+export async function firstOwnerBody(threadId: number): Promise<string> {
+  await ensureSchema();
+  const rows = await db
+    .select()
+    .from(conversationMessages)
+    .where(eq(conversationMessages.conversationId, threadId))
+    .orderBy(conversationMessages.at);
+  return rows.find((r) => r.role === "owner" && r.type === "message")?.body ?? "";
+}
+
 /** Set a thread's lifecycle/turn without adding a message. */
 export async function setStatus(threadId: number, status: ThreadStatus): Promise<void> {
   await ensureSchema();

@@ -1281,3 +1281,104 @@ a.console__item-name:hover {
 .diff__line--context {
   color: var(--sc-text);
 }
+
+/* Threads launcher + projected transcript (work-046 / work-047, ADR-016).
+   The launcher replaces the old in-app chat runtime: the conversation lives in a Claude
+   Code session; this surface opens it, resumes it, and projects its transcript. */
+.launcher {
+  margin-top: 1.25rem;
+}
+.launcher__hint {
+  margin: 0 0 0.75rem;
+  color: var(--sc-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.launcher__notice {
+  border-left-color: var(--sc-attention);
+}
+.launcher--resume {
+  background: var(--sc-surface);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  padding: 1.1rem 1.25rem;
+}
+.launcher__cmdrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 0.9rem;
+}
+.launcher__cmd {
+  flex: 1 1 20rem;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  background: var(--sc-bg);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  padding: 0.55rem 0.7rem;
+  color: var(--sc-text);
+}
+.launcher__copy {
+  flex: 0 0 auto;
+  cursor: pointer;
+  border: 1px solid var(--sc-border);
+  background: var(--sc-surface);
+  color: var(--sc-text);
+  border-radius: var(--sc-radius);
+  padding: 0.5rem 0.85rem;
+  font-size: 0.82rem;
+}
+.launcher__copy:hover {
+  border-color: var(--sc-accent);
+}
+.launcher__open {
+  display: inline-block;
+  color: var(--sc-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.launcher__open:hover {
+  text-decoration: underline;
+}
+.launcher__resume {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--sc-border);
+}
+.launcher__resume-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.thread-transcript {
+  margin-top: 1.5rem;
+}
+.thread-transcript__src {
+  margin: -0.35rem 0 0.75rem;
+  color: var(--sc-muted);
+  font-size: 0.82rem;
+}
+.transcript__tool {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.2rem;
+  color: var(--sc-muted);
+  font-size: 0.85rem;
+}
+.transcript__tool-label {
+  font-variant: small-caps;
+  letter-spacing: 0.03em;
+  color: var(--sc-muted);
+  flex: 0 0 auto;
+}
+.transcript__tool-list {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+}

@@ -6,7 +6,10 @@ import {
   branchThread,
   createOrgThread,
   createThread,
+  firstOwnerBody,
   getThread,
+  launchThread,
+  linkThreadSession,
   listThreads,
   orgFollowup,
   setStatus,
@@ -176,6 +179,47 @@ describe("generated feature-request cards (work-032)", () => {
       status: "needs-you",
     });
     expect((await getThread(thread.id))?.thread.status).toBe("needs-you");
+  });
+});
+
+describe("thread launcher (work-046, ADR-016)", () => {
+  it("launchThread stamps launchedAt without duplicating the opener when unchanged", async () => {
+    const t = await createThread("Launch me", "Give me a State of the Product.");
+    const seed = await firstOwnerBody(t.id);
+    expect(seed).toBe("Give me a State of the Product.");
+
+    await launchThread(t.id, seed); // same as the opener — must not append a second copy
+    const loaded = await getThread(t.id);
+    expect(loaded?.thread.launchedAt).toBeTruthy();
+    expect(loaded?.thread.status).toBe("working");
+    const ownerMsgs = loaded?.messages.filter((m) => m.role === "owner" && m.type === "message");
+    expect(ownerMsgs).toHaveLength(1); // no duplicate
+  });
+
+  it("launchThread records an edited seed as a new owner message", async () => {
+    const t = await createThread("Edit at launch", "First draft of the ask.");
+    await launchThread(t.id, "A refined ask, edited before launch.");
+    const loaded = await getThread(t.id);
+    const ownerMsgs = loaded?.messages.filter((m) => m.role === "owner" && m.type === "message");
+    expect(ownerMsgs).toHaveLength(2);
+    expect(ownerMsgs?.at(-1)?.body).toBe("A refined ask, edited before launch.");
+    expect(loaded?.thread.launchedAt).toBeTruthy();
+  });
+
+  it("linkThreadSession persists the correlated session so it isn't rescanned", async () => {
+    const t = await createThread("Correlate me", "Do a thing.");
+    await launchThread(t.id, "Do a thing.");
+    await linkThreadSession(t.id, "sess-uuid-xyz", "/home/.claude/projects/x/sess-uuid-xyz.jsonl");
+    const loaded = await getThread(t.id);
+    expect(loaded?.thread.sessionUuid).toBe("sess-uuid-xyz");
+    expect(loaded?.thread.sessionPath).toBe("/home/.claude/projects/x/sess-uuid-xyz.jsonl");
+  });
+
+  it("a fresh thread is not launched and has no correlated session", async () => {
+    const t = await createThread("Fresh", "Nothing launched yet.");
+    const loaded = await getThread(t.id);
+    expect(loaded?.thread.launchedAt).toBeNull();
+    expect(loaded?.thread.sessionUuid).toBeNull();
   });
 });
 
