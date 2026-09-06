@@ -19,8 +19,9 @@ export function meta(_: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   await ensureSchema();
+  // We still record the visit (telemetry stays in the ledger of pageVisits) but no longer
+  // surface a running count in the header — on a single-user console it's vanity, not signal.
   await db.insert(pageVisits).values({ path: new URL(request.url).pathname, at: Date.now() });
-  const visits = await db.select().from(pageVisits);
   const registry = await readRegistry();
   // Org summary for the Agents panel: execs with their employee headcount (ADR-017).
   const org = await readOrg();
@@ -42,7 +43,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     registry,
     orgSummary,
-    visitCount: visits.length,
     version: APP_VERSION,
     threads,
     threadCount: all.length,
@@ -51,7 +51,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { registry, orgSummary, visitCount, version, threads, threadCount, needsYou } = loaderData;
+  const { registry, orgSummary, version, threads, threadCount, needsYou } = loaderData;
 
   return (
     <main className="console">
@@ -60,9 +60,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <p className="console__eyebrow">Scope Creep</p>
           <h1 className="console__title">Console</h1>
         </div>
-        <p className="console__meta">
-          v{version} · {visitCount} visit{visitCount === 1 ? "" : "s"}
-        </p>
+        <p className="console__meta">v{version}</p>
       </header>
 
       {!registry.available && (
@@ -108,11 +106,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   <Link to={`/explore/agents/${exec.name}`} className="console__item-name">
                     {agentDisplayName(exec.name)}
                   </Link>
-                  {exec.reports > 0 && (
-                    <span className="console__tag">
-                      {exec.reports} report{exec.reports === 1 ? "" : "s"}
-                    </span>
-                  )}
+                  {/* One consistent report indicator on every row — including "0 reports" —
+                      so the column reads as a clean, aligned count rather than a ragged mix. */}
+                  <span className="console__tag console__tag--count">
+                    {exec.reports} report{exec.reports === 1 ? "" : "s"}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -125,33 +123,40 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           )}
         </Panel>
 
-        <Panel title="Apps" count={registry.apps.length}>
-          {registry.apps.length === 0 ? (
-            <p className="console__empty">No apps registered yet.</p>
-          ) : (
-            <ul className="console__list">
-              {registry.apps.map((app, i) => (
-                <li key={app.name ?? i} className="console__item">
-                  <RegistryName name={app.name} repo={app.repo} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
+        {/* Apps and extensions share one card (both live in their own repos and link out).
+            Kept as two labeled sub-lists so a near-empty Apps list and a lone extension
+            read as one balanced panel instead of two lopsided ones. */}
+        <Panel title="Apps & extensions" count={registry.apps.length + registry.extensions.length}>
+          <div className="console__subgroup">
+            <h3 className="console__subtitle">Apps</h3>
+            {registry.apps.length === 0 ? (
+              <p className="console__empty">No apps registered yet.</p>
+            ) : (
+              <ul className="console__list">
+                {registry.apps.map((app, i) => (
+                  <li key={app.name ?? i} className="console__item">
+                    <RegistryName name={app.name} repo={app.repo} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-        <Panel title="Extensions" count={registry.extensions.length}>
-          {registry.extensions.length === 0 ? (
-            <p className="console__empty">None installed yet.</p>
-          ) : (
-            <ul className="console__list">
-              {registry.extensions.map((ext, i) => (
-                <li key={ext.name ?? i} className="console__item">
-                  <RegistryName name={ext.name} repo={ext.repo} />
-                  {ext.kind && <span className="console__tag">{ext.kind}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="console__subgroup">
+            <h3 className="console__subtitle">Extensions</h3>
+            {registry.extensions.length === 0 ? (
+              <p className="console__empty">None installed yet.</p>
+            ) : (
+              <ul className="console__list">
+                {registry.extensions.map((ext, i) => (
+                  <li key={ext.name ?? i} className="console__item">
+                    <RegistryName name={ext.name} repo={ext.repo} />
+                    {ext.kind && <span className="console__tag">{ext.kind}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </Panel>
       </section>
     </main>
