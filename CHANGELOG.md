@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.16.0 — 2026-09-06
+- **CoS-Threads MVP** (work-029, ADR-012): Chat + Work Requests are unified into one
+  top-level **Threads** surface on the conversation primitive. The legacy
+  `requests`/`request_messages` tables are migrated into `conversations`/
+  `conversation_messages` and retired (data-preserving migration `0001`). A thread now
+  carries an explicit **lifecycle/turn** (`open → needs-you | working → closed`) — the
+  native fix for the work-011 "whose turn" bug, surfaced on the list as a single **status
+  dot** (orange = waiting on you) — and renders intake **outcomes** inline as typed cards
+  that deep-link to their artifact. The Console home gains a **Threads** card. The Human-
+  Input Log now reads a single consolidated owner-message source. Old `/chat` and
+  `/work/requests[/:id]` redirect to `/threads`. Every thread is a Chief-of-Staff
+  conversation (the old pinned "Console chat" is gone); triage stays async in the operator
+  session — live in-app replies land in a later phase on the flagship runtime.
+
 ## 0.15.0 — 2026-09-05
 - **Human-Input Log — expand to full message** (work-021, PR #14): a truncated entry is
   now a native `<details>` disclosure; clicking reveals the full message inline

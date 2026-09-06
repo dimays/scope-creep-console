@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loader as healthzLoader } from "./healthz";
-import { action as requestsAction, loader as requestsLoader } from "./work-requests";
+import { action as threadsAction, loader as threadsLoader } from "./threads";
+import { loader as requestsRedirect } from "./work-requests";
 
 // Exercises route loaders/actions end to end against the in-memory db (vitest
 // config points DATABASE_URL at :memory:), so a broken loader fails the gate —
@@ -17,30 +18,38 @@ describe("route: /healthz", () => {
   });
 });
 
-describe("route: /work/requests", () => {
-  it("loader returns the requests list", async () => {
-    const data = await requestsLoader({} as never);
-    expect(Array.isArray(data.requests)).toBe(true);
+describe("route: /threads (work-029, ADR-012)", () => {
+  it("loader returns the threads list", async () => {
+    const data = await threadsLoader({} as never);
+    expect(Array.isArray(data.threads)).toBe(true);
   });
 
   it("action rejects empty input", async () => {
     const form = new FormData();
     form.set("title", "");
     form.set("body", "");
-    const res = await requestsAction({
-      request: new Request("http://localhost/work/requests", { method: "POST", body: form }),
+    const res = await threadsAction({
+      request: new Request("http://localhost/threads", { method: "POST", body: form }),
     } as never);
     expect(res).toEqual({ ok: false });
   });
 
-  it("action creates a request and redirects to it", async () => {
+  it("action opens a thread and redirects to it", async () => {
     const form = new FormData();
-    form.set("title", "A test request");
+    form.set("title", "A test thread");
     form.set("body", "Please do the thing.");
-    const res = (await requestsAction({
-      request: new Request("http://localhost/work/requests", { method: "POST", body: form }),
+    const res = (await threadsAction({
+      request: new Request("http://localhost/threads", { method: "POST", body: form }),
     } as never)) as Response;
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toMatch(/^\/work\/requests\/\d+$/);
+    expect(res.headers.get("location")).toMatch(/^\/threads\/\d+$/);
+  });
+});
+
+describe("route: /work/requests (legacy redirect)", () => {
+  it("redirects to /threads", () => {
+    const res = requestsRedirect() as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/threads");
   });
 });

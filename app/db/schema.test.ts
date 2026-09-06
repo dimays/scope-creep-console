@@ -21,7 +21,7 @@ describe("schema migrations", () => {
       .filter((v) => is(v, Table))
       .map((v) => getTableName(v as Table));
 
-    expect(declared.length).toBeGreaterThanOrEqual(6);
+    expect(declared.length).toBeGreaterThanOrEqual(4);
     for (const name of declared) {
       expect(present.has(name), `table '${name}' missing after migrate`).toBe(true);
     }

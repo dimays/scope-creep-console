@@ -8,6 +8,13 @@
       "when": 1788636097752,
       "tag": "0000_cold_colonel_america",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788656951427,
+      "tag": "0001_boring_stranger",
+      "breakpoints": true
     }
   ]
 }

@@ -26,8 +26,8 @@ function TopNav() {
       <NavLink to="/work" className={linkClass}>
         Work
       </NavLink>
-      <NavLink to="/chat" className={linkClass}>
-        Chat
+      <NavLink to="/threads" className={linkClass}>
+        Threads
       </NavLink>
     </nav>
   );

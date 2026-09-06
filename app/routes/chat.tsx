@@ -1,28 +1,10 @@
-import { ChatMount } from "~/components/chat-mount";
-import { getOrCreateConversation, listMessages } from "~/lib/conversation.server";
-import type { Route } from "./+types/chat";
+import { redirect } from "react-router";
 
-export function meta(_: Route.MetaArgs) {
-  return [{ title: "Chat · Scope Creep" }];
-}
-
-export async function loader(_: Route.LoaderArgs) {
-  const conversationId = await getOrCreateConversation("chat", "Console chat");
-  const messages = await listMessages(conversationId);
-  return { messages };
-}
-
-export default function Chat({ loaderData }: Route.ComponentProps) {
-  return (
-    <main className="console">
-      <header className="console__header">
-        <div>
-          <p className="console__eyebrow">Scope Creep</p>
-          <h1 className="console__title">Chat</h1>
-        </div>
-        <p className="console__meta">in-app assistant · work-014</p>
-      </header>
-      <ChatMount initialMessages={loaderData.messages} />
-    </main>
-  );
+/**
+ * Legacy redirect (work-029, ADR-012): the top-level Chat tab was subsumed by the
+ * unified Threads surface. The live agent chat is now the `chat`-kind thread under
+ * /threads; the ChatMount resource endpoint (/chat/send) is unchanged.
+ */
+export function loader() {
+  return redirect("/threads");
 }
