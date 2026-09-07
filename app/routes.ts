@@ -37,6 +37,8 @@ export default [
   route("work/requests/:id", "routes/work-request.tsx"),
   route("work/inputs", "routes/work-inputs.tsx"),
   route("work/:id", "routes/work-item.tsx"),
-  // Owner settings — model picker (work-018) and future persisted preferences.
+  // Legacy redirect → Org. Settings held only the chat-model picker (work-018) for the
+  // in-app assistant retired in ADR-019; the nav entry is gone and the route redirects
+  // so old /settings links don't 404. (See routes/settings.tsx.)
   route("settings", "routes/settings.tsx"),
 ] satisfies RouteConfig;

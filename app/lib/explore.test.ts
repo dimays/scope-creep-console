@@ -5,7 +5,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loader as loopLoader } from "../routes/explore-loop";
 import { loader as loopsLoader } from "../routes/explore-loops";
 import {
+  buildLinkIndex,
+  consistency,
   extractWikilinks,
+  listLedger,
   listLoops,
   loopsOwnedBy,
   parseFrontmatter,
@@ -236,5 +239,96 @@ describe("loops loaders + cross-link graph", () => {
     process.env.SCOPE_CREEP_HOME = join(home, "does-not-exist");
     expect(await listLoops()).toEqual([]);
     process.env.SCOPE_CREEP_HOME = saved;
+  });
+});
+
+// The honest consistency check (issue: hundreds of false "dangling" links): a wikilink
+// resolves against the WHOLE namespace, and repeats within a doc collapse to one issue.
+describe("consistency: honest dangling-link resolution", () => {
+  let home: string;
+  let prev: string | undefined;
+
+  beforeAll(() => {
+    prev = process.env.SCOPE_CREEP_HOME;
+    home = mkdtempSync(join(tmpdir(), "scope-creep-consistency-"));
+    mkdirSync(join(home, "charter"));
+    mkdirSync(join(home, "work"));
+    mkdirSync(join(home, "registry"));
+    mkdirSync(join(home, "loops"));
+    mkdirSync(join(home, "ledger"));
+
+    // A doc whose body cites a work item (twice), a template, a loop, and one target
+    // nothing owns. Only the last is genuine drift; the repeat must not double-count.
+    writeFileSync(
+      join(home, "charter", "sample.md"),
+      [
+        "---",
+        "name: sample",
+        "description: sample doc",
+        "---",
+        "",
+        "# Sample",
+        "Cross-links: [[work-101]], [[work-101]] again, [[backend-engineer]],",
+        "[[core-upgrade]], and [[ghost-target]] which points at nothing.",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(home, "work", "101-thing.md"),
+      "---\nid: work-101\ntitle: A thing\nstatus: done\n---\nbody\n",
+    );
+    writeFileSync(
+      join(home, "registry", "agents.json"),
+      JSON.stringify({ agents: [{ name: "ada" }] }),
+    );
+    writeFileSync(join(home, "registry", "apps.json"), JSON.stringify({ apps: [] }));
+    writeFileSync(join(home, "registry", "extensions.json"), JSON.stringify({ extensions: [] }));
+    writeFileSync(
+      join(home, "registry", "employee-templates.json"),
+      JSON.stringify({ templates: [{ name: "backend-engineer" }] }),
+    );
+    writeFileSync(
+      join(home, "registry", "loops.json"),
+      JSON.stringify({ loops: [{ name: "core-upgrade", kind: "loop" }] }),
+    );
+    // Two ledger entries: one with a frontmatter name, one without (docSlug fallback).
+    writeFileSync(
+      join(home, "ledger", "000-genesis.md"),
+      "---\nname: ledger-000-genesis\n---\n\n# Genesis\n",
+    );
+    writeFileSync(join(home, "ledger", "001-nameless.md"), "# Nameless entry\n");
+    process.env.SCOPE_CREEP_HOME = home;
+  });
+
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prev;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("buildLinkIndex spans docs, work, agents, templates, and loops", async () => {
+    const index = await buildLinkIndex();
+    expect(index.docs.has("sample")).toBe(true);
+    expect(index.work.has("work-101")).toBe(true);
+    expect(index.agents.has("ada")).toBe(true);
+    expect(index.templates.has("backend-engineer")).toBe(true);
+    expect(index.loops.has("core-upgrade")).toBe(true);
+  });
+
+  it("flags only the genuinely-unresolvable target, de-duped per doc", async () => {
+    const report = await consistency();
+    const fromSample = report.danglingLinks.filter((l) => l.from === "sample");
+    // work/template/loop links resolve; the repeated work link counts once; only the
+    // ghost remains — one item, not five.
+    expect(fromSample).toEqual([{ from: "sample", target: "ghost-target" }]);
+  });
+
+  it("listLedger computes a docSlug that matches the doc viewer's slug", async () => {
+    const entries = await listLedger();
+    const named = entries.find((e) => e.file === "000-genesis.md");
+    const nameless = entries.find((e) => e.file === "001-nameless.md");
+    // With a frontmatter name, docSlug is that name; without, it mirrors listDocs'
+    // path-based slug so /explore/docs/:slug still resolves.
+    expect(named?.docSlug).toBe("ledger-000-genesis");
+    expect(nameless?.docSlug).toBe("ledger-001-nameless-md");
   });
 });

@@ -5,6 +5,7 @@ import { agentDisplayName, DISPLAY_NAMES } from "./display-name";
 import { type TicketRef, ticketsFor } from "./org.server";
 import { readRegistry } from "./registry.server";
 import { APP_VERSION } from "./version";
+import { type LinkIndex, linkifyWikilinks, resolveWikilink } from "./wikilinks";
 import { listWork } from "./work.server";
 
 /**
@@ -25,6 +26,7 @@ const DOC_DIRS: Array<{ dir: string; group: string }> = [
   { dir: "loops", group: "Loops" },
   { dir: "agents", group: "Agents" },
   { dir: "registry", group: "Registry" },
+  { dir: "reference", group: "Reference" },
   { dir: "environments", group: "Environments" },
   { dir: "ledger", group: "Ledger" },
 ];
@@ -141,14 +143,29 @@ export async function listDocs(): Promise<DocRecord[]> {
   return docs;
 }
 
-async function renderMarkdown(body: string, slugs: Set<string>): Promise<string> {
-  const linked = body.replace(/\[\[([^\]]+)\]\]/g, (_full, ref: string) => {
-    const [target, alias] = ref.split("|");
-    const key = target.trim();
-    const label = (alias ?? target).trim();
-    return slugs.has(key) ? `[${label}](/explore/docs/${key})` : `\`[[${ref}]]\``;
-  });
-  return await marked.parse(linked);
+/**
+ * The full addressable namespace a `[[wikilink]]` can point at: doc slugs, work
+ * items, agents, employee templates, and loops. Built once and threaded through
+ * markdown rendering and the consistency check so both agree on what "resolves".
+ */
+export async function buildLinkIndex(): Promise<LinkIndex> {
+  const [docs, work, registry, loops] = await Promise.all([
+    listDocs(),
+    listWork(),
+    readRegistry(),
+    listLoops(),
+  ]);
+  return {
+    docs: new Set(docs.map((d) => d.slug)),
+    work: new Set(work.map((w) => w.id)),
+    agents: new Set(registry.agents.map((a) => a.name)),
+    templates: new Set(registry.templates.map((t) => t.name)),
+    loops: new Set(loops.map((l) => l.name)),
+  };
+}
+
+async function renderMarkdown(body: string, index: LinkIndex): Promise<string> {
+  return await marked.parse(linkifyWikilinks(body, index));
 }
 
 export async function readDoc(slug: string): Promise<{ doc: DocRecord; html: string } | null> {
@@ -158,7 +175,7 @@ export async function readDoc(slug: string): Promise<{ doc: DocRecord; html: str
   const src = await readMd(doc.path);
   if (src === null) return null;
   const { body } = parseFrontmatter(src);
-  const html = await renderMarkdown(body, new Set(docs.map((d) => d.slug)));
+  const html = await renderMarkdown(body, await buildLinkIndex());
   return { doc, html };
 }
 
@@ -167,6 +184,9 @@ export type LedgerEntry = {
   title: string;
   order: number;
   file: string;
+  /** The `/explore/docs/:slug` id this entry renders under — computed exactly the
+   *  way {@link listDocs} slugs a ledger doc, so the Timeline link always resolves. */
+  docSlug: string;
 };
 
 export async function listLedger(): Promise<LedgerEntry[]> {
@@ -182,11 +202,14 @@ export async function listLedger(): Promise<LedgerEntry[]> {
     const src = await readMd(join("ledger", file));
     if (src === null) continue;
     const { fm, body } = parseFrontmatter(src);
+    // Mirror listDocs' slug rule so /explore/docs/:slug resolves for every entry.
+    const docSlug = fm.name ?? join("ledger", file).replace(/[/.]/g, "-");
     entries.push({
       slug: fm.name ?? file.replace(/\.md$/, ""),
       title: firstHeading(body, fm.name ?? file),
       order: Number.parseInt(file, 10) || 0,
       file,
+      docSlug,
     });
   }
   return entries.sort((a, b) => b.order - a.order);
@@ -282,8 +305,7 @@ export async function readAgent(name: string): Promise<AgentProfile | null> {
   const src = await readMd(entry?.path ?? join("agents", `${name}.md`));
   if (src === null) return null;
   const { fm, body } = parseFrontmatter(src);
-  const docs = await listDocs();
-  const charterHtml = await renderMarkdown(body, new Set(docs.map((d) => d.slug)));
+  const charterHtml = await renderMarkdown(body, await buildLinkIndex());
 
   const display = DISPLAY_NAMES[name] ?? firstHeading(body, agentDisplayName(name));
   const contributions: LedgerEntry[] = [];
@@ -336,8 +358,7 @@ export async function readTemplate(name: string): Promise<TemplateProfile | null
   const src = await readMd(entry?.path ?? join("agents", "templates", `${name}.md`));
   if (src === null) return null;
   const { fm, body } = parseFrontmatter(src);
-  const docs = await listDocs();
-  const manualHtml = await renderMarkdown(body, new Set(docs.map((d) => d.slug)));
+  const manualHtml = await renderMarkdown(body, await buildLinkIndex());
   const roster = registry.agents
     .filter((a) => a.kind === "employee" && a.template === name)
     .map((a) => ({ name: a.name, reportsTo: a.reports_to, status: a.status }))
@@ -387,7 +408,12 @@ export function versionSkew(v: {
 
 export async function consistency(): Promise<ConsistencyReport> {
   const docs = await listDocs();
-  const slugs = new Set(docs.map((d) => d.slug));
+  // A wikilink resolves against the WHOLE namespace (docs, work, agents, templates,
+  // loops) — not just doc slugs — so `[[work-017]]` / `[[backend-engineer]]` /
+  // `[[core-upgrade]]` count as resolved (they are real pages), and only a target
+  // that points at nothing is flagged. This reduces noise, never truth: a genuine
+  // typo like `[[adr-999]]` still surfaces.
+  const index = await buildLinkIndex();
 
   const danglingLinks: ConsistencyReport["danglingLinks"] = [];
   const staleDocs: ConsistencyReport["staleDocs"] = [];
@@ -398,8 +424,15 @@ export async function consistency(): Promise<ConsistencyReport> {
     const src = await readMd(doc.path);
     if (src === null) continue;
     const { fm, body } = parseFrontmatter(src);
+    // One broken reference per (source doc, target) — a doc that cites a missing
+    // target ten times is one thing to fix, not ten. De-dupe within the doc.
+    const seen = new Set<string>();
     for (const target of extractWikilinks(body)) {
-      if (!slugs.has(target)) danglingLinks.push({ from: doc.slug, target });
+      const key = target.trim();
+      if (resolveWikilink(key, index) !== null) continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      danglingLinks.push({ from: doc.slug, target: key });
     }
     if (fm.status === "proposed") {
       proposedDocs.push({ slug: doc.slug, title: doc.title });
