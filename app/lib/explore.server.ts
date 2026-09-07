@@ -247,6 +247,108 @@ export async function threadReferences(texts: string[]): Promise<ArtifactRef[]> 
   return extractReferences(texts, await buildLinkIndex());
 }
 
+// --- org activity feed (work-037, the entity/episodic lens of transparent
+// delegation) — reads the structured activity log work-036's hook writes. Until
+// that hook lands the log is empty, so every reader here is honest-empty; it never
+// infers activity from prose (ADR-013 refit). -----------------------------------
+
+export type ActivityEvent = {
+  /** ISO date/time or epoch-ms string, best-effort. */
+  ts?: string;
+  id?: string;
+  /** The agent slug that acted. */
+  actor: string;
+  /** spawn | delegate | staff | confer (per work-036); kept open for forward compat. */
+  type: string;
+  summary: string;
+  threadId?: number;
+  /** A ledger entry / PR / thread URL or path the event points at. */
+  refUrl?: string;
+  sessionId?: string;
+};
+
+/**
+ * Parse one `activity/*.ndjson` line into a typed event (work-036 schema:
+ * `{ts,id,actor,type,summary,threadId?,refUrl?,sessionId}`). Pure + unit-tested;
+ * tolerant — a blank line, non-JSON, or an event missing `actor`/`type` yields null
+ * (dropped) rather than throwing, so a partially-written log never breaks the feed.
+ */
+export function parseActivityLine(line: string): ActivityEvent | null {
+  const t = line.trim();
+  if (!t) return null;
+  let o: Record<string, unknown>;
+  try {
+    o = JSON.parse(t);
+  } catch {
+    return null;
+  }
+  const actor = typeof o.actor === "string" ? o.actor : "";
+  const type = typeof o.type === "string" ? o.type : "";
+  if (!actor || !type) return null;
+  const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+  return {
+    actor,
+    type,
+    summary: str(o.summary) ?? "",
+    ts: str(o.ts) ?? (typeof o.ts === "number" ? String(o.ts) : undefined),
+    id: str(o.id),
+    threadId: typeof o.threadId === "number" ? o.threadId : undefined,
+    refUrl: str(o.refUrl),
+    sessionId: str(o.sessionId),
+  };
+}
+
+/** The whole org-activity log, newest first — or [] when the `activity/` record-set
+ *  is absent/empty (work-036's hook hasn't run). Never invents an event. */
+export async function listActivity(): Promise<ActivityEvent[]> {
+  let files: string[];
+  try {
+    files = await readdir(join(home(), "activity"));
+  } catch {
+    return [];
+  }
+  const out: ActivityEvent[] = [];
+  for (const file of files.sort()) {
+    if (!file.endsWith(".ndjson")) continue;
+    const src = await readMd(join("activity", file));
+    if (src === null) continue;
+    for (const line of src.split("\n")) {
+      const ev = parseActivityLine(line);
+      if (ev) out.push(ev);
+    }
+  }
+  return out.sort((a, b) => (b.ts ?? "").localeCompare(a.ts ?? ""));
+}
+
+/** The activity events a given agent was the actor of, newest first. */
+export async function activityForActor(actor: string): Promise<ActivityEvent[]> {
+  return (await listActivity()).filter((e) => e.actor === actor);
+}
+
+/** The in-Console href an event points at: its refUrl (a path or URL) if present,
+ *  else its thread. Null when it points nowhere resolvable. Pure. */
+export function activityHref(ev: ActivityEvent): string | null {
+  if (ev.refUrl) return ev.refUrl;
+  if (typeof ev.threadId === "number") return `/threads/${ev.threadId}`;
+  return null;
+}
+
+/** A readable verb for a work-036 event type; unknown types pass through. Pure. */
+export function activityVerb(type: string): string {
+  switch (type) {
+    case "spawn":
+      return "spun up";
+    case "delegate":
+      return "delegated";
+    case "staff":
+      return "staffed";
+    case "confer":
+      return "conferred";
+    default:
+      return type;
+  }
+}
+
 export async function readDoc(slug: string): Promise<{ doc: DocRecord; html: string } | null> {
   const docs = await listDocs();
   const doc = docs.find((d) => d.slug === slug);

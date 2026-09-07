@@ -5,6 +5,7 @@ import { db, ensureSchema } from "~/db";
 import { feedback } from "~/db/schema";
 import {
   consistency,
+  listActivity,
   listDocs,
   listLedger,
   listLoops,
@@ -21,18 +22,29 @@ export function meta(_: Route.MetaArgs) {
 
 export async function loader(_: Route.LoaderArgs) {
   await ensureSchema();
-  const [docs, ledger, loops, registry, report, feedbackRows, releases, roadmap, routines] =
-    await Promise.all([
-      listDocs(),
-      listLedger(),
-      listLoops(),
-      readRegistry(),
-      consistency(),
-      db.select().from(feedback),
-      listReleases(),
-      listRoadmap(),
-      readRoutines(),
-    ]);
+  const [
+    docs,
+    ledger,
+    loops,
+    registry,
+    report,
+    feedbackRows,
+    releases,
+    roadmap,
+    routines,
+    activity,
+  ] = await Promise.all([
+    listDocs(),
+    listLedger(),
+    listLoops(),
+    readRegistry(),
+    consistency(),
+    db.select().from(feedback),
+    listReleases(),
+    listRoadmap(),
+    readRoutines(),
+    listActivity(),
+  ]);
   return {
     counts: {
       docs: docs.length,
@@ -42,6 +54,7 @@ export async function loader(_: Route.LoaderArgs) {
       releases: releases.length,
       roadmap: roadmap.length,
       schedules: routines.routines.length,
+      activity: activity.length,
     },
     issues:
       report.danglingLinks.length +
@@ -79,6 +92,9 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
         </ExploreCard>
         <ExploreCard to="/explore/roadmap" title="Roadmap" count={counts.roadmap}>
           The CEO's board presentations — the latest deck plus its history.
+        </ExploreCard>
+        <ExploreCard to="/explore/activity" title="Activity" count={counts.activity}>
+          Who spun up, delegated, and staffed what — the org working, read-only.
         </ExploreCard>
         <ExploreCard to="/explore/timeline" title="Timeline" count={counts.ledger}>
           Every recorded decision and event, newest first.

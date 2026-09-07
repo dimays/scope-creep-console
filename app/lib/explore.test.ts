@@ -5,18 +5,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loader as loopLoader } from "../routes/explore-loop";
 import { loader as loopsLoader } from "../routes/explore-loops";
 import {
+  activityForActor,
+  activityHref,
+  activityVerb,
   buildLinkIndex,
   cadenceHistoryFor,
   consistency,
   describeCron,
   extractReferences,
   extractWikilinks,
+  listActivity,
   listDocs,
   listLedger,
   listLoops,
   listReleases,
   listRoadmap,
   loopsOwnedBy,
+  parseActivityLine,
   parseCadenceDecisions,
   parseFrontmatter,
   parseLoops,
@@ -415,6 +420,84 @@ describe("listReleases / listRoadmap: newest-first, template-excluded projection
 // routines reader — pure/tolerant so "empty is empty" holds before any loop has run.
 // Thread link-out cards (work-048): extract the artifacts a thread references from
 // its text, resolving against the namespace; drop what points at nothing.
+// Org activity feed (work-037): parse the work-036 log, honest-empty until it lands.
+describe("activity: parseActivityLine / activityHref / activityVerb", () => {
+  it("parses a well-formed event and drops malformed/incomplete lines", () => {
+    const ev = parseActivityLine(
+      '{"ts":"2026-09-07T05:00:00Z","id":"e1","actor":"chief-of-staff","type":"delegate","summary":"handed work-052 to ada","threadId":7}',
+    );
+    expect(ev).toEqual({
+      ts: "2026-09-07T05:00:00Z",
+      id: "e1",
+      actor: "chief-of-staff",
+      type: "delegate",
+      summary: "handed work-052 to ada",
+      threadId: 7,
+      refUrl: undefined,
+      sessionId: undefined,
+    });
+    expect(parseActivityLine("")).toBeNull();
+    expect(parseActivityLine("not json")).toBeNull();
+    expect(parseActivityLine('{"type":"spawn"}')).toBeNull(); // no actor
+    expect(parseActivityLine('{"actor":"cto"}')).toBeNull(); // no type
+  });
+
+  it("prefers refUrl, falls back to the thread, else null", () => {
+    expect(
+      activityHref({ actor: "a", type: "confer", summary: "", refUrl: "/explore/docs/adr-013" }),
+    ).toBe("/explore/docs/adr-013");
+    expect(activityHref({ actor: "a", type: "confer", summary: "", threadId: 3 })).toBe(
+      "/threads/3",
+    );
+    expect(activityHref({ actor: "a", type: "confer", summary: "" })).toBeNull();
+  });
+
+  it("maps event types to verbs, passing unknowns through", () => {
+    expect(activityVerb("spawn")).toBe("spun up");
+    expect(activityVerb("delegate")).toBe("delegated");
+    expect(activityVerb("staff")).toBe("staffed");
+    expect(activityVerb("confer")).toBe("conferred");
+    expect(activityVerb("reviewed")).toBe("reviewed");
+  });
+});
+
+describe("listActivity / activityForActor (hermetic)", () => {
+  let home: string;
+  let prev: string | undefined;
+
+  beforeAll(() => {
+    prev = process.env.SCOPE_CREEP_HOME;
+    home = mkdtempSync(join(tmpdir(), "scope-creep-activity-"));
+    mkdirSync(join(home, "activity"));
+    writeFileSync(
+      join(home, "activity", "2026-09.ndjson"),
+      [
+        '{"ts":"2026-09-07T05:00:00Z","actor":"chief-of-staff","type":"delegate","summary":"to ada"}',
+        "", // blank line tolerated
+        "garbage-not-json",
+        '{"ts":"2026-09-07T06:00:00Z","actor":"cto","type":"spawn","summary":"linus"}',
+      ].join("\n"),
+    );
+    process.env.SCOPE_CREEP_HOME = home;
+  });
+
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prev;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("reads the log newest-first, dropping malformed lines", async () => {
+    const events = await listActivity();
+    expect(events.map((e) => e.actor)).toEqual(["cto", "chief-of-staff"]);
+  });
+
+  it("filters to one actor", async () => {
+    expect((await activityForActor("cto")).map((e) => e.summary)).toEqual(["linus"]);
+    expect(await activityForActor("nobody")).toEqual([]);
+  });
+});
+
 describe("extractReferences (thread link-out cards)", () => {
   const index = {
     docs: new Set(["adr-016", "prd-cos-threads"]),
