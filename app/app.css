@@ -928,6 +928,58 @@ a.console__item-name:hover {
   background: var(--sc-attention);
 }
 
+/* Org activity feed (work-037): the @scope-creep/design ActivityRow is headless
+   (data-sc-* attributes); the look lives here on tokens. actor · verb · summary ·
+   time, with the summary linking to the artifact when the event points at one. */
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.5rem;
+}
+
+[data-sc-activity-row] {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--sc-border);
+}
+
+[data-sc-activity-row]:last-child {
+  border-bottom: none;
+}
+
+[data-sc-activity-actor] {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+[data-sc-activity-summary] {
+  flex: 1;
+  min-width: 0;
+}
+
+[data-sc-activity-link] {
+  color: var(--sc-text);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--sc-motion) var(--sc-ease);
+}
+
+[data-sc-activity-link]:hover {
+  border-bottom-color: var(--sc-accent);
+}
+
+[data-sc-activity-time] {
+  color: var(--sc-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.activity-row__verb {
+  color: var(--sc-accent);
+}
+
 /* Link-out cards (work-048): the artifacts a thread references, as scannable chips.
    A kind badge (colored by class), the label, and — for a PR/issue — an external arrow. */
 .thread-refs {

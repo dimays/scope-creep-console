@@ -9,6 +9,7 @@ const LINKS = [
   { to: "/explore/schedules", label: "Schedules", end: false },
   { to: "/explore/releases", label: "Releases", end: false },
   { to: "/explore/roadmap", label: "Roadmap", end: false },
+  { to: "/explore/activity", label: "Activity", end: false },
   { to: "/explore/timeline", label: "Timeline", end: false },
   { to: "/explore/consistency", label: "Consistency", end: false },
 ];

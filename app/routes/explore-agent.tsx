@@ -1,6 +1,7 @@
+import { ActivityRow } from "@scope-creep/design";
 import { Link } from "react-router";
 import { ExploreNav } from "~/components/explore-nav";
-import { readAgent } from "~/lib/explore.server";
+import { activityForActor, activityHref, activityVerb, readAgent } from "~/lib/explore.server";
 import type { Route } from "./+types/explore-agent";
 
 export function meta({ params }: Route.MetaArgs) {
@@ -10,11 +11,18 @@ export function meta({ params }: Route.MetaArgs) {
 export async function loader({ params }: Route.LoaderArgs) {
   const agent = await readAgent(params.name);
   if (!agent) throw new Response("Not found", { status: 404 });
-  return agent;
+  // Recent activity (work-037): the spawns/delegations/confers this agent was the
+  // actor of, from work-036's log — honest-empty until that hook lands.
+  const activity = (await activityForActor(params.name)).slice(0, 20).map((e) => ({
+    ...e,
+    verb: activityVerb(e.type),
+    href: activityHref(e),
+  }));
+  return { agent, activity };
 }
 
 export default function ExploreAgent({ loaderData }: Route.ComponentProps) {
-  const agent = loaderData;
+  const { agent, activity } = loaderData;
   const isEmployee = agent.kind === "employee";
   return (
     <main className="console">
@@ -92,6 +100,32 @@ export default function ExploreAgent({ loaderData }: Route.ComponentProps) {
           </ul>
         </section>
       )}
+
+      <section className="doc-group">
+        <div className="console__panel-head">
+          <h2 className="doc-group__title">Recent activity</h2>
+          <span className="console__count">{activity.length}</span>
+        </div>
+        {activity.length === 0 ? (
+          <p className="console__empty">
+            No activity captured yet. Spin-ups, delegations, and confers appear here once the
+            capture hook (<code>work-036</code>) is wired — never inferred from prose.
+          </p>
+        ) : (
+          <div className="activity-feed">
+            {activity.map((e) => (
+              <ActivityRow
+                key={e.id ?? `${e.ts}-${e.summary}`}
+                className="activity-row"
+                time={e.ts ?? undefined}
+                href={e.href ?? undefined}
+              >
+                <span className="activity-row__verb">{e.verb}</span> {e.summary}
+              </ActivityRow>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="doc-group">
         <div className="console__panel-head">
