@@ -8,7 +8,7 @@
         "@libsql/client": "^0.14.0",
         "@react-router/node": "8.3.1",
         "@react-router/serve": "8.3.1",
-        "@scope-creep/design": "github:dimays/scope-creep-design#v0.2.0",
+        "@scope-creep/design": "github:dimays/scope-creep-design#v0.4.0",
         "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0",
         "drizzle-orm": "^0.36.4",
         "isbot": "^5.1.36",
@@ -273,7 +273,7 @@
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.63.1", "", { "os": "win32", "cpu": "x64" }, "sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w=="],
 
-    "@scope-creep/design": ["@scope-creep/design@github:dimays/scope-creep-design#0158ada", { "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "dimays-scope-creep-design-0158ada", "sha512-i044KRfU9ikGc+mzms6ElZVcyMI2CJzntwE9KZTXuSM8cHqGhPbnaqUrDXOpJRnpey5CaZFnvOQj7Bq/TuSzDQ=="],
+    "@scope-creep/design": ["@scope-creep/design@github:dimays/scope-creep-design#7df63ec", { "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "dimays-scope-creep-design-7df63ec", "sha512-n1/B/P5SKES51YRW/qBZDJqe4wr0FLW0gJNKNPLkBRgaDBzcmeP2m5SxcrpgQL+8bmLg09CQNtGKcjuTJyD5GA=="],
 
     "@scope-creep/ext-feedback": ["@scope-creep/ext-feedback@github:dimays/scope-creep-ext-feedback#8bed623", {}, "dimays-scope-creep-ext-feedback-8bed623", "sha512-1tFEbJJl1UXnXyYBCriIV3gZ2ON8qMbnCOcd/nwcLmxWtQb1K2xv8mBiWBSbKigPp3E7I0iGGYQVcy9Eh87+dg=="],
 

@@ -69,6 +69,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Dark-only (work-045): the design tokens set `color-scheme: dark` on :root,
+            but this meta tells the UA before CSS loads, so the first paint (canvas,
+            scrollbars, form controls) is dark too — no light flash. */}
+        <meta name="color-scheme" content="dark" />
         <Meta />
         <Links />
       </head>
