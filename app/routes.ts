@@ -29,6 +29,10 @@ export default [
   route("explore/loops", "routes/explore-loops.tsx"),
   route("explore/loops/:name", "routes/explore-loop.tsx"),
   route("explore/timeline", "routes/explore-timeline.tsx"),
+  // Console operations surfaces (prd-console-operations): Releases (work-054),
+  // Roadmap (work-056) — read-only projections of the control-plane artifacts.
+  route("explore/releases", "routes/explore-releases.tsx"),
+  route("explore/roadmap", "routes/explore-roadmap.tsx"),
   route("explore/consistency", "routes/explore-consistency.tsx"),
   route("work", "routes/work.tsx"),
   route("work/history", "routes/work-history.tsx"),

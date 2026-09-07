@@ -8,8 +8,11 @@ import {
   buildLinkIndex,
   consistency,
   extractWikilinks,
+  listDocs,
   listLedger,
   listLoops,
+  listReleases,
+  listRoadmap,
   loopsOwnedBy,
   parseFrontmatter,
   parseLoops,
@@ -330,5 +333,75 @@ describe("consistency: honest dangling-link resolution", () => {
     // path-based slug so /explore/docs/:slug still resolves.
     expect(named?.docSlug).toBe("ledger-000-genesis");
     expect(nameless?.docSlug).toBe("ledger-001-nameless-md");
+  });
+});
+
+// Releases + Roadmap surfaces (work-054 / work-056): newest-first projections that
+// skip templates/READMEs, never invent an entry, and slug to the doc viewer.
+describe("listReleases / listRoadmap: newest-first, template-excluded projections", () => {
+  let home: string;
+  let prev: string | undefined;
+
+  beforeAll(() => {
+    prev = process.env.SCOPE_CREEP_HOME;
+    home = mkdtempSync(join(tmpdir(), "scope-creep-artifacts-"));
+    mkdirSync(join(home, "releases"));
+    mkdirSync(join(home, "roadmap"));
+    // A template (must be excluded), a README (excluded), and two real releases.
+    writeFileSync(
+      join(home, "releases", "000-template.md"),
+      "---\nname: release-000-template\n---\n\n# Template\n[[roadmap-NNN]]\n",
+    );
+    writeFileSync(join(home, "releases", "README.md"), "# readme\n");
+    writeFileSync(
+      join(home, "releases", "001-v0.1.0.md"),
+      "---\nname: release-001\ndescription: first\n---\n\n# Release 001 — v0.1.0\n- **Date range:** 2026-09-04 – 2026-09-06\n",
+    );
+    writeFileSync(
+      join(home, "releases", "002-v0.2.0.md"),
+      "---\nname: release-002\ndescription: second\n---\n\n# Release 002 — v0.2.0\n- **Date:** 2026-09-07\n",
+    );
+    writeFileSync(
+      join(home, "roadmap", "000-template.md"),
+      "---\nname: roadmap-000-template\n---\n\n# Template\n[[roadmap-NNN]]\n",
+    );
+    writeFileSync(
+      join(home, "roadmap", "001-2026-09-07-founding.md"),
+      "---\nname: roadmap-001\ndescription: founding\n---\n\n# Roadmap 001\n- **Date:** 2026-09-07\n",
+    );
+    process.env.SCOPE_CREEP_HOME = home;
+  });
+
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prev;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("lists releases newest-first, excluding template + README, with date + doc slug", async () => {
+    const releases = await listReleases();
+    expect(releases.map((r) => r.slug)).toEqual(["release-002", "release-001"]);
+    expect(releases[0]).toMatchObject({
+      title: "Release 002 — v0.2.0",
+      description: "second",
+      date: "2026-09-07",
+      order: 2,
+    });
+    expect(releases[1].date).toBe("2026-09-04 – 2026-09-06");
+  });
+
+  it("lists roadmap presentations newest-first, template excluded", async () => {
+    const roadmap = await listRoadmap();
+    expect(roadmap.map((r) => r.slug)).toEqual(["roadmap-001"]);
+  });
+
+  it("excludes 000-template.md from the doc browser + link index", async () => {
+    const docs = await listDocs();
+    expect(docs.some((d) => d.slug === "release-000-template")).toBe(false);
+    // real releases still browse as docs (so /explore/docs/:slug renders them)
+    expect(docs.some((d) => d.slug === "release-002")).toBe(true);
+    const index = await buildLinkIndex();
+    expect(index.docs.has("release-002")).toBe(true);
+    expect(index.docs.has("release-000-template")).toBe(false);
   });
 });

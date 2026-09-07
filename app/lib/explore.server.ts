@@ -28,8 +28,17 @@ const DOC_DIRS: Array<{ dir: string; group: string }> = [
   { dir: "registry", group: "Registry" },
   { dir: "reference", group: "Reference" },
   { dir: "environments", group: "Environments" },
+  { dir: "releases", group: "Releases" },
+  { dir: "roadmap", group: "Roadmap" },
   { dir: "ledger", group: "Ledger" },
 ];
+
+/** A `NNN-template.md` is a shape, not a doc — exempt from the browser, the link
+ *  index, and the consistency check (its placeholder `[[roadmap-NNN]]` etc. are not
+ *  real dangling links), exactly as the control-plane `docs:lint` exempts them. */
+function isTemplateFile(file: string): boolean {
+  return file === "000-template.md";
+}
 
 export type Frontmatter = {
   name?: string;
@@ -125,7 +134,7 @@ export async function listDocs(): Promise<DocRecord[]> {
       continue;
     }
     for (const file of files.sort()) {
-      if (!file.endsWith(".md")) continue;
+      if (!file.endsWith(".md") || isTemplateFile(file)) continue;
       const rel = join(dir, file);
       const src = await readMd(rel);
       if (src === null) continue;
@@ -213,6 +222,64 @@ export async function listLedger(): Promise<LedgerEntry[]> {
     });
   }
   return entries.sort((a, b) => b.order - a.order);
+}
+
+// --- releases + roadmap (projected artifacts, newest first) --------------
+
+export type ArtifactEntry = {
+  /** The `/explore/docs/:slug` id this entry renders under (its frontmatter name). */
+  slug: string;
+  /** The document's H1 (e.g. "Release 002 — v0.2.0 (Autonomous governance)"). */
+  title: string;
+  description: string;
+  /** The `NNN` file prefix — the supersession order; higher is newer. */
+  order: number;
+  /** The `**Date:**` / `**Date range:**` line from the body, if present. */
+  date?: string;
+  file: string;
+};
+
+/**
+ * Read a projected-artifact directory (`releases/` or `roadmap/`) into typed
+ * entries, newest first (`NNN` desc). Templates and READMEs are excluded, so an
+ * empty directory (or one holding only the template) reads as **empty** — the
+ * surfaces must never invent a release or a deck ([[adr-016]] honesty rule). No
+ * network, no Claude call: local files under `SCOPE_CREEP_HOME` only.
+ */
+async function listArtifacts(dir: string): Promise<ArtifactEntry[]> {
+  let files: string[];
+  try {
+    files = await readdir(join(home(), dir));
+  } catch {
+    return [];
+  }
+  const out: ArtifactEntry[] = [];
+  for (const file of files) {
+    if (!file.endsWith(".md") || file === "README.md" || isTemplateFile(file)) continue;
+    const src = await readMd(join(dir, file));
+    if (src === null) continue;
+    const { fm, body } = parseFrontmatter(src);
+    out.push({
+      slug: fm.name ?? join(dir, file).replace(/[/.]/g, "-"),
+      title: firstHeading(body, fm.name ?? file.replace(/\.md$/, "")),
+      description: fm.description ?? "",
+      order: Number.parseInt(file, 10) || 0,
+      date: /\*\*Date(?:\s+range)?:\*\*\s*(.+)/.exec(body)?.[1]?.trim(),
+      file,
+    });
+  }
+  return out.sort((a, b) => b.order - a.order);
+}
+
+/** Control-plane release-notes entries, newest first (work-054). */
+export async function listReleases(): Promise<ArtifactEntry[]> {
+  return listArtifacts("releases");
+}
+
+/** CEO roadmap-presentation entries, newest first (work-056). The head of the
+ *  list is the latest presentation; the tail is the supersession history. */
+export async function listRoadmap(): Promise<ArtifactEntry[]> {
+  return listArtifacts("roadmap");
 }
 
 export { agentDisplayName };
