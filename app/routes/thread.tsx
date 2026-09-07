@@ -1,3 +1,4 @@
+import { ActivityRow } from "@scope-creep/design";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, redirect, useNavigation, useRevalidator } from "react-router";
@@ -6,7 +7,13 @@ import { SubmitButton } from "~/components/state";
 import { ResumePanel, ThreadLauncher } from "~/components/thread-launcher";
 import type { ProjectedTurn } from "~/lib/claude-sessions";
 import { resolveThreadProjection } from "~/lib/claude-sessions.server";
-import { threadReferences } from "~/lib/explore.server";
+import {
+  activityForThread,
+  activityHref,
+  activityVerb,
+  agentDisplayName,
+  threadReferences,
+} from "~/lib/explore.server";
 import {
   parseMeta,
   type ThreadInitiator,
@@ -57,7 +64,15 @@ export async function loader({ params }: Route.LoaderArgs) {
     ...(projection.status === "matched" ? projection.turns.map((t) => t.text) : []),
   ];
   const references = await threadReferences(refTexts);
-  return { ...thread, projection, references };
+  // Inline agent activity (work-031): the spawns/delegations/confers logged against this
+  // thread, projected from the work-036 activity log — honest-empty until that hook lands.
+  const activity = (await activityForThread(id)).map((e) => ({
+    ...e,
+    actorDisplay: agentDisplayName(e.actor),
+    verb: activityVerb(e.type),
+    href: activityHref(e),
+  }));
+  return { ...thread, projection, references, activity };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -123,7 +138,7 @@ function authorLabel(msg: ThreadMessage): string {
 }
 
 export default function Thread({ loaderData }: Route.ComponentProps) {
-  const { thread, messages, parent, branches, projection, references } = loaderData;
+  const { thread, messages, parent, branches, projection, references, activity } = loaderData;
   const status = thread.status as ThreadStatus;
   const orgInitiated = (thread.initiator as ThreadInitiator) === "org";
   const lastMessageId = messages.at(-1)?.id ?? null;
@@ -256,6 +271,34 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
         </>
       ) : (
         <ThreadLauncher seed={seed} launching={launching} />
+      )}
+
+      {/* Inline agent activity (work-031): the spin-ups/delegations/confers logged against
+          this thread, as a read-only inline timeline. Only shown when the thread actually
+          triggered org work — no empty-state clutter on threads that didn't. */}
+      {activity.length > 0 && (
+        <section className="doc-group thread-activity">
+          <h2 className="doc-group__title">
+            Org activity <span className="console__count">{activity.length}</span>
+          </h2>
+          <div className="activity-feed">
+            {activity.map((e) => (
+              <ActivityRow
+                key={e.id ?? `${e.ts}-${e.summary}`}
+                className="activity-row"
+                actor={
+                  <Link to={`/explore/agents/${e.actor}`} className="console__item-name">
+                    {e.actorDisplay}
+                  </Link>
+                }
+                time={e.ts ?? undefined}
+                href={e.href ?? undefined}
+              >
+                <span className="activity-row__verb">{e.verb}</span> {e.summary}
+              </ActivityRow>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Link-out cards (work-048): the real artifacts this thread references, deep-linking

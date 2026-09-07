@@ -325,6 +325,14 @@ export async function activityForActor(actor: string): Promise<ActivityEvent[]> 
   return (await listActivity()).filter((e) => e.actor === actor);
 }
 
+/** The activity events tied to a given thread, oldest first (they read as an inline
+ *  timeline of what the org did inside that thread — work-031). */
+export async function activityForThread(threadId: number): Promise<ActivityEvent[]> {
+  return (await listActivity())
+    .filter((e) => e.threadId === threadId)
+    .sort((a, b) => (a.ts ?? "").localeCompare(b.ts ?? ""));
+}
+
 /** The in-Console href an event points at: its refUrl (a path or URL) if present,
  *  else its thread. Null when it points nowhere resolvable. Pure. */
 export function activityHref(ev: ActivityEvent): string | null {
