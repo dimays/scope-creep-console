@@ -178,6 +178,75 @@ async function renderMarkdown(body: string, index: LinkIndex): Promise<string> {
   return await marked.parse(linkifyWikilinks(body, index));
 }
 
+// --- thread link-out cards (work-048) ------------------------------------
+
+export type ArtifactRef = {
+  kind: "pr" | "issue" | "ticket" | "doc" | "agent" | "template" | "loop";
+  label: string;
+  href: string;
+  external: boolean;
+};
+
+const GH_REF_RE = /https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(pull|issues)\/(\d+)/g;
+
+function kindFromHref(href: string): ArtifactRef["kind"] {
+  if (href.startsWith("/work/")) return "ticket";
+  if (href.startsWith("/explore/agents/")) return "agent";
+  if (href.startsWith("/explore/templates/")) return "template";
+  if (href.startsWith("/explore/loops/")) return "loop";
+  return "doc";
+}
+
+/**
+ * Extract the artifacts a set of texts *reference* — GitHub PR/issue URLs, and any
+ * `[[wikilink]]` or bare `work-NNN` that resolves against the namespace — as
+ * deep-linkable cards (work-048). Pure + unit-tested. Sourced from real text only
+ * (thread messages + the projected transcript); a target that resolves to nothing
+ * is dropped, never invented ([[adr-016]]). De-duped by href, PRs/tickets/docs first.
+ */
+export function extractReferences(texts: string[], index: LinkIndex): ArtifactRef[] {
+  const byHref = new Map<string, ArtifactRef>();
+  for (const text of texts) {
+    for (const m of text.matchAll(GH_REF_RE)) {
+      const [url, owner, repo, kind, n] = m;
+      if (!byHref.has(url)) {
+        byHref.set(url, {
+          kind: kind === "pull" ? "pr" : "issue",
+          label: `${owner}/${repo}#${n}`,
+          href: url,
+          external: true,
+        });
+      }
+    }
+    const targets = extractWikilinks(text);
+    for (const m of text.matchAll(/\bwork-\d+\b/g)) targets.push(m[0]);
+    for (const target of targets) {
+      const href = resolveWikilink(target, index);
+      if (!href || byHref.has(href)) continue;
+      byHref.set(href, { kind: kindFromHref(href), label: target.trim(), href, external: false });
+    }
+  }
+  const order: ArtifactRef["kind"][] = [
+    "pr",
+    "issue",
+    "ticket",
+    "doc",
+    "loop",
+    "agent",
+    "template",
+  ];
+  return [...byHref.values()].sort(
+    (a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || a.label.localeCompare(b.label),
+  );
+}
+
+/** Resolve the artifact cards a thread references (work-048): build the namespace
+ *  index once, then extract from the given texts (messages + projected transcript). */
+export async function threadReferences(texts: string[]): Promise<ArtifactRef[]> {
+  if (texts.every((t) => !t)) return [];
+  return extractReferences(texts, await buildLinkIndex());
+}
+
 export async function readDoc(slug: string): Promise<{ doc: DocRecord; html: string } | null> {
   const docs = await listDocs();
   const doc = docs.find((d) => d.slug === slug);

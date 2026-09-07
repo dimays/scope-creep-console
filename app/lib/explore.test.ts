@@ -9,6 +9,7 @@ import {
   cadenceHistoryFor,
   consistency,
   describeCron,
+  extractReferences,
   extractWikilinks,
   listDocs,
   listLedger,
@@ -412,6 +413,57 @@ describe("listReleases / listRoadmap: newest-first, template-excluded projection
 
 // Schedules surface (work-052): the cron describer, cadence-decision parser, and
 // routines reader — pure/tolerant so "empty is empty" holds before any loop has run.
+// Thread link-out cards (work-048): extract the artifacts a thread references from
+// its text, resolving against the namespace; drop what points at nothing.
+describe("extractReferences (thread link-out cards)", () => {
+  const index = {
+    docs: new Set(["adr-016", "prd-cos-threads"]),
+    work: new Set(["work-048"]),
+    agents: new Set(["chief-of-staff"]),
+    templates: new Set<string>(),
+    loops: new Set(["dev-cycle"]),
+  };
+
+  it("pulls PR URLs, wikilinks, and bare work-NNN, resolved + de-duped", () => {
+    const texts = [
+      "Landed https://github.com/dimays/scope-creep-console/pull/48 for [[work-048]].",
+      "See [[adr-016]] and [[prd-cos-threads]]; ran the dev-cycle. Also work-048 again.",
+      "Handed to [[chief-of-staff]].",
+    ];
+    const refs = extractReferences(texts, index);
+    expect(refs).toEqual([
+      {
+        kind: "pr",
+        label: "dimays/scope-creep-console#48",
+        href: "https://github.com/dimays/scope-creep-console/pull/48",
+        external: true,
+      },
+      { kind: "ticket", label: "work-048", href: "/work/work-048", external: false },
+      { kind: "doc", label: "adr-016", href: "/explore/docs/adr-016", external: false },
+      {
+        kind: "doc",
+        label: "prd-cos-threads",
+        href: "/explore/docs/prd-cos-threads",
+        external: false,
+      },
+      {
+        kind: "agent",
+        label: "chief-of-staff",
+        href: "/explore/agents/chief-of-staff",
+        external: false,
+      },
+    ]);
+  });
+
+  it("drops references that resolve to nothing (never invents)", () => {
+    expect(extractReferences(["[[adr-999]] and [[ghost]] and work-777"], index)).toEqual([]);
+  });
+
+  it("is empty for empty text", () => {
+    expect(extractReferences(["", ""], index)).toEqual([]);
+  });
+});
+
 describe("schedules: describeCron / parseCadenceDecisions", () => {
   it("describes the routines' crons in human terms", () => {
     expect(describeCron("0 14 * * 1")).toBe("Mondays at 14:00 UTC");

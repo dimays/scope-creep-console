@@ -6,6 +6,7 @@ import { SubmitButton } from "~/components/state";
 import { ResumePanel, ThreadLauncher } from "~/components/thread-launcher";
 import type { ProjectedTurn } from "~/lib/claude-sessions";
 import { resolveThreadProjection } from "~/lib/claude-sessions.server";
+import { threadReferences } from "~/lib/explore.server";
 import {
   parseMeta,
   type ThreadInitiator,
@@ -48,7 +49,15 @@ export async function loader({ params }: Route.LoaderArgs) {
   if (projection.newlyResolved && projection.sessionUuid && projection.sessionPath) {
     await linkThreadSession(id, projection.sessionUuid, projection.sessionPath);
   }
-  return { ...thread, projection };
+  // Link-out cards (work-048): the artifacts this thread references — PRs, tickets, docs,
+  // PRDs, ledger, loops, agents — sourced from the thread messages + the projected
+  // transcript, resolved to real URLs/routes. Never invented; unresolved refs are dropped.
+  const refTexts = [
+    ...thread.messages.map((m) => m.body),
+    ...(projection.status === "matched" ? projection.turns.map((t) => t.text) : []),
+  ];
+  const references = await threadReferences(refTexts);
+  return { ...thread, projection, references };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -114,7 +123,7 @@ function authorLabel(msg: ThreadMessage): string {
 }
 
 export default function Thread({ loaderData }: Route.ComponentProps) {
-  const { thread, messages, parent, branches, projection } = loaderData;
+  const { thread, messages, parent, branches, projection, references } = loaderData;
   const status = thread.status as ThreadStatus;
   const orgInitiated = (thread.initiator as ThreadInitiator) === "org";
   const lastMessageId = messages.at(-1)?.id ?? null;
@@ -247,6 +256,39 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
         </>
       ) : (
         <ThreadLauncher seed={seed} launching={launching} />
+      )}
+
+      {/* Link-out cards (work-048): the real artifacts this thread references, deep-linking
+          to the PRs/tickets/docs/PRDs/ledger/loops it touched. Sourced from the messages +
+          projected transcript; unresolved refs are dropped, never invented. */}
+      {references.length > 0 && (
+        <section className="doc-group thread-refs">
+          <h2 className="doc-group__title">
+            References <span className="console__count">{references.length}</span>
+          </h2>
+          <ul className="ref-cards">
+            {references.map((ref) =>
+              ref.external ? (
+                <li key={ref.href} className="ref-card">
+                  <a href={ref.href} target="_blank" rel="noreferrer" className="ref-card__link">
+                    <span className={`ref-card__kind ref-card__kind--${ref.kind}`}>{ref.kind}</span>
+                    <span className="ref-card__label">{ref.label}</span>
+                    <span className="ref-card__ext" aria-hidden="true">
+                      ↗
+                    </span>
+                  </a>
+                </li>
+              ) : (
+                <li key={ref.href} className="ref-card">
+                  <Link to={ref.href} className="ref-card__link">
+                    <span className={`ref-card__kind ref-card__kind--${ref.kind}`}>{ref.kind}</span>
+                    <span className="ref-card__label">{ref.label}</span>
+                  </Link>
+                </li>
+              ),
+            )}
+          </ul>
+        </section>
       )}
 
       {/* Branches list (work-032): child threads split off this one — the forward link. */}
