@@ -256,6 +256,79 @@ describe("loops loaders + cross-link graph", () => {
   });
 });
 
+// Eval Phase-1 (work-007 / adr-015): the agent profile's contribution history is
+// attribution-grounded — authored (owner_agent) is kept apart from mere mention, and
+// ADRs led come from the manifest, never inferred.
+describe("readAgent eval history (adr-015 attribution)", () => {
+  let home: string;
+  let prev: string | undefined;
+
+  beforeAll(() => {
+    prev = process.env.SCOPE_CREEP_HOME;
+    home = mkdtempSync(join(tmpdir(), "scope-creep-eval-"));
+    mkdirSync(join(home, "agents"));
+    mkdirSync(join(home, "standards", "adr"), { recursive: true });
+    mkdirSync(join(home, "ledger"));
+    writeFileSync(
+      join(home, "agents", "chief-of-staff.md"),
+      "---\nname: chief-of-staff\ndescription: orchestrator\nmetadata:\n  status: active\n---\n\n# Chief of Staff\n",
+    );
+    writeFileSync(
+      join(home, "agents", "cto.md"),
+      "---\nname: cto\ndescription: architecture\nmetadata:\n  status: active\n---\n\n# CTO\n",
+    );
+    // Two ADRs: one led by the CoS, one by the CTO — only the CoS's is "led by" here.
+    writeFileSync(
+      join(home, "standards", "adr", "010-a.md"),
+      "---\nname: adr-010\nmetadata:\n  owner_agent: chief-of-staff\n---\n\n# ADR-010\n",
+    );
+    writeFileSync(
+      join(home, "standards", "adr", "011-b.md"),
+      "---\nname: adr-011\nmetadata:\n  owner_agent: cto\n---\n\n# ADR-011\n",
+    );
+    // One ledger entry authored by the CoS; one authored by the CTO that merely mentions
+    // "chief-of-staff" in prose — a mention is not authorship.
+    writeFileSync(
+      join(home, "ledger", "001-authored.md"),
+      "---\nname: ledger-001-authored\nmetadata:\n  owner_agent: chief-of-staff\n---\n\n# Authored by CoS\n",
+    );
+    writeFileSync(
+      join(home, "ledger", "002-mentions.md"),
+      "---\nname: ledger-002-mentions\nmetadata:\n  owner_agent: cto\n---\n\n# CTO entry\nHanded to chief-of-staff for ratification.\n",
+    );
+    process.env.SCOPE_CREEP_HOME = home;
+  });
+
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prev;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("separates authored from mentioned and lists ADRs led — all grounded, all linked", async () => {
+    const agent = await readAgent("chief-of-staff");
+    const e = agent?.evalHistory;
+    expect(e?.adrsLed).toEqual([{ title: "adr-010", href: "/explore/docs/adr-010" }]);
+    expect(e?.ledgerAuthored).toEqual([
+      { title: "Authored by CoS", href: "/explore/docs/ledger-001-authored" },
+    ]);
+    expect(e?.ledgerMentioned).toEqual([
+      { title: "CTO entry", href: "/explore/docs/ledger-002-mentions" },
+    ]);
+    // The uncaptured signals are named, never rendered as an earned zero.
+    expect(e?.notYetCaptured.length).toBeGreaterThan(0);
+  });
+
+  it("is empty-honest for an agent with no authored artifacts", async () => {
+    const agent = await readAgent("cto"); // no agents/cto.md → falls back, no artifacts authored here
+    // cto authored adr-011 + ledger-002, so it's not fully empty — assert its own attribution.
+    expect(agent?.evalHistory.adrsLed).toEqual([
+      { title: "adr-011", href: "/explore/docs/adr-011" },
+    ]);
+    expect(agent?.evalHistory.ledgerMentioned).toEqual([]); // cto isn't mentioned in others here
+  });
+});
+
 // The honest consistency check (issue: hundreds of false "dangling" links): a wikilink
 // resolves against the WHOLE namespace, and repeats within a doc collapse to one issue.
 describe("consistency: honest dangling-link resolution", () => {

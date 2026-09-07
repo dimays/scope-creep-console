@@ -57,6 +57,8 @@ export type DocRecord = {
   group: string;
   path: string;
   status?: string;
+  /** The manifest `owner_agent`, for authorship-grounded eval signals (adr-015). */
+  ownerAgent?: string;
 };
 
 // --- pure helpers (unit-tested) ------------------------------------------
@@ -147,6 +149,7 @@ export async function listDocs(): Promise<DocRecord[]> {
         group,
         path: rel,
         status: fm.status,
+        ownerAgent: fm.ownerAgent,
       });
     }
   }
@@ -376,6 +379,9 @@ export type LedgerEntry = {
   /** The `/explore/docs/:slug` id this entry renders under — computed exactly the
    *  way {@link listDocs} slugs a ledger doc, so the Timeline link always resolves. */
   docSlug: string;
+  /** The manifest `owner_agent` — who *authored* the entry (adr-015 attribution).
+   *  Distinct from an agent merely *mentioned* in the body. */
+  ownerAgent?: string;
 };
 
 export async function listLedger(): Promise<LedgerEntry[]> {
@@ -399,6 +405,7 @@ export async function listLedger(): Promise<LedgerEntry[]> {
       order: Number.parseInt(file, 10) || 0,
       file,
       docSlug,
+      ownerAgent: fm.ownerAgent,
     });
   }
   return entries.sort((a, b) => b.order - a.order);
@@ -712,6 +719,29 @@ export function loopsOwnedBy(loops: LoopRecord[], agent: string): LoopRecord[] {
 
 export type AgentDirectReport = { name: string; template?: string; status?: string };
 
+/** A grounded, clickable eval signal — a real artifact the agent authored. */
+export type EvalSignal = { title: string; href: string };
+
+/**
+ * The Phase-1 eval surface for an agent (adr-015 / work-007): a **transparent
+ * contribution history**, not a score. Every signal is an *authored* artifact
+ * (manifest `owner_agent`), never a mere mention (adr-015 §B.3 attribution-over-
+ * inference), and it links through to the artifact (§B.4). Signals that aren't yet
+ * captured (the activity graph until work-036; structured QA/CRO verdicts) are named
+ * honestly rather than shown as an earned zero — this is descriptive, and no number
+ * is a score until the ADR's Phase 2.
+ */
+export type EvalHistory = {
+  /** ADRs the agent led (`owner_agent` match). */
+  adrsLed: EvalSignal[];
+  /** Ledger entries the agent authored (`owner_agent` match). */
+  ledgerAuthored: EvalSignal[];
+  /** Ledger entries that only *mention* the agent — kept separate from authorship. */
+  ledgerMentioned: EvalSignal[];
+  /** Signals adr-015 defines but that can't be grounded yet — named, never faked. */
+  notYetCaptured: string[];
+};
+
 export type AgentProfile = {
   name: string;
   displayName: string;
@@ -720,6 +750,8 @@ export type AgentProfile = {
   charterHtml: string;
   contributions: LedgerEntry[];
   loopsOwned: LoopRecord[];
+  /** Phase-1 contribution-history eval (adr-015) — descriptive, not a score. */
+  evalHistory: EvalHistory;
   // Org fields (ADR-017):
   kind?: string;
   reportsTo?: string;
@@ -741,13 +773,42 @@ export async function readAgent(name: string): Promise<AgentProfile | null> {
   const charterHtml = await renderMarkdown(body, await buildLinkIndex());
 
   const display = DISPLAY_NAMES[name] ?? firstHeading(body, agentDisplayName(name));
+  const ledger = await listLedger();
   const contributions: LedgerEntry[] = [];
-  for (const entry of await listLedger()) {
+  // Attribution-grounded (adr-015 §B.3): authored = the entry's own owner_agent is
+  // this agent; mentioned = the agent appears in the prose but didn't author it. A
+  // mention is not authorship, so the eval keeps them apart.
+  const ledgerAuthored: EvalSignal[] = [];
+  const ledgerMentioned: EvalSignal[] = [];
+  for (const entry of ledger) {
     const entrySrc = await readMd(join("ledger", entry.file));
-    if (entrySrc && (entrySrc.includes(display) || entrySrc.includes(name))) {
+    const mentioned = !!entrySrc && (entrySrc.includes(display) || entrySrc.includes(name));
+    if (entry.ownerAgent === name) {
+      ledgerAuthored.push({ title: entry.title, href: `/explore/docs/${entry.docSlug}` });
+      contributions.push(entry);
+    } else if (mentioned) {
+      ledgerMentioned.push({ title: entry.title, href: `/explore/docs/${entry.docSlug}` });
       contributions.push(entry);
     }
   }
+
+  // ADRs led = ADR docs whose manifest owner_agent is this agent (a grounded, authored
+  // signal, adr-015 §B.2). Uses the doc namespace so each links to its rendered page.
+  const adrsLed: EvalSignal[] = (await listDocs())
+    .filter((d) => d.group === "ADRs" && d.ownerAgent === name)
+    .map((d) => ({ title: d.title, href: `/explore/docs/${d.slug}` }));
+
+  const evalHistory: EvalHistory = {
+    adrsLed,
+    ledgerAuthored,
+    ledgerMentioned,
+    // Named honestly, never rendered as an earned 0 (adr-015 §B.5 empty-is-empty).
+    notYetCaptured: [
+      "delegation/spawn activity (work-036 capture hook not live yet)",
+      "structured QA verdicts & CRO verifications (no typed record-set yet)",
+      "PRs landed attributed per-agent (needs the git-manager's ledger records)",
+    ],
+  };
 
   const loopsOwned = loopsOwnedBy(await listLoops(), name);
   const directReports: AgentDirectReport[] = registry.agents
@@ -764,6 +825,7 @@ export async function readAgent(name: string): Promise<AgentProfile | null> {
     charterHtml,
     contributions,
     loopsOwned,
+    evalHistory,
     kind: entry?.kind,
     reportsTo: entry?.reports_to,
     template: entry?.template,

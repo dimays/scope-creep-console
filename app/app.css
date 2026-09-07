@@ -928,6 +928,42 @@ a.console__item-name:hover {
   background: var(--sc-attention);
 }
 
+/* Eval — Phase-1 contribution history (work-007 / adr-015). Grounded signal groups;
+   the mention-only group is muted so authored signals read as primary; the gaps sit in
+   a collapsed <details> so "not yet captured" is honest but never shouty. */
+.eval-history .eval-group + .eval-group {
+  margin-top: 0.75rem;
+}
+
+.eval-group__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.eval-group__label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.eval-group--muted .eval-group__label {
+  color: var(--sc-muted);
+  font-weight: 500;
+}
+
+.eval-gaps {
+  margin-top: 0.75rem;
+}
+
+.eval-gaps summary {
+  cursor: pointer;
+}
+
+.eval-gaps__list {
+  margin-top: 0.375rem;
+}
+
 /* Org activity feed (work-037): the @scope-creep/design ActivityRow is headless
    (data-sc-* attributes); the look lives here on tokens. actor · verb · summary ·
    time, with the summary linking to the artifact when the event points at one. */

@@ -57,6 +57,38 @@ export default function ExploreAgent({ loaderData }: Route.ComponentProps) {
         </p>
       )}
 
+      {/* Eval — Phase-1 contribution history (adr-015 / work-007). Attribution-grounded,
+          descriptive, NOT a score; every item links to the real artifact, and the signals
+          that can't be grounded yet are named honestly rather than shown as an earned zero. */}
+      <section className="doc-group eval-history">
+        <div className="console__panel-head">
+          <h2 className="doc-group__title">Eval — contribution history</h2>
+          <span className="console__tag">Phase 1 · not a score</span>
+        </div>
+        <p className="console__empty">
+          A transparent, attribution-grounded projection of what this agent{" "}
+          <strong>authored</strong> — descriptive, never a score (adr-015). Each item links to the
+          real artifact.
+        </p>
+        <EvalGroup label="ADRs led" items={agent.evalHistory.adrsLed} />
+        <EvalGroup label="Ledger entries authored" items={agent.evalHistory.ledgerAuthored} />
+        <EvalGroup
+          label="Mentioned (not authored)"
+          items={agent.evalHistory.ledgerMentioned}
+          muted
+        />
+        <details className="eval-gaps">
+          <summary className="console__meta">Signals not yet captured (never faked)</summary>
+          <ul className="console__list eval-gaps__list">
+            {agent.evalHistory.notYetCaptured.map((g) => (
+              <li key={g} className="console__empty">
+                {g}
+              </li>
+            ))}
+          </ul>
+        </details>
+      </section>
+
       <section className="doc-group">
         <div className="console__panel-head">
           <h2 className="doc-group__title">Staffed to</h2>
@@ -129,27 +161,6 @@ export default function ExploreAgent({ loaderData }: Route.ComponentProps) {
 
       <section className="doc-group">
         <div className="console__panel-head">
-          <h2 className="doc-group__title">Contributions</h2>
-          <span className="console__count">{agent.contributions.length}</span>
-        </div>
-        {agent.contributions.length === 0 ? (
-          <p className="console__empty">No ledger entries reference this agent yet.</p>
-        ) : (
-          <ul className="console__list">
-            {agent.contributions.map((entry) => (
-              <li key={entry.slug} className="doc-row">
-                <Link to="/explore/timeline" className="console__item-name">
-                  {entry.title}
-                </Link>
-                <span className="console__tag">#{String(entry.order).padStart(3, "0")}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="doc-group">
-        <div className="console__panel-head">
           <h2 className="doc-group__title">Loops owned</h2>
           <span className="console__count">{agent.loopsOwned.length}</span>
         </div>
@@ -175,5 +186,40 @@ export default function ExploreAgent({ loaderData }: Route.ComponentProps) {
         <article className="prose" dangerouslySetInnerHTML={{ __html: agent.charterHtml }} />
       </section>
     </main>
+  );
+}
+
+/** One grounded eval signal group: a labeled count + the linked artifacts, or an
+ *  honest "none yet" when empty (adr-015 empty-is-empty). `muted` styles the
+ *  mention-only group so it reads as secondary to authored signals. */
+function EvalGroup({
+  label,
+  items,
+  muted,
+}: {
+  label: string;
+  items: { title: string; href: string }[];
+  muted?: boolean;
+}) {
+  return (
+    <div className={muted ? "eval-group eval-group--muted" : "eval-group"}>
+      <div className="eval-group__head">
+        <span className="eval-group__label">{label}</span>
+        <span className="console__count">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="console__empty">None yet.</p>
+      ) : (
+        <ul className="console__list">
+          {items.map((it) => (
+            <li key={it.href} className="doc-row">
+              <Link to={it.href} className="console__item-name">
+                {it.title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
