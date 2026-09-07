@@ -1,6 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { marked } from "marked";
+import { buildLinkIndex } from "./explore.server";
+import { linkifyWikilinks } from "./wikilinks";
 
 /**
  * Reads the control plane's work-item system of record (work/*.md) so the Console
@@ -113,9 +115,10 @@ export async function readWorkItem(id: string): Promise<{ item: WorkItem; html: 
   const src = await readFile(join(home(), "work", item.file), "utf8");
   const end = src.indexOf("\n---", 3);
   const body = end === -1 ? src : src.slice(end + 4);
-  const linked = body.replace(/\[\[([^\]]+)\]\]/g, (_full, ref: string) => {
-    const key = ref.split("|")[0].trim();
-    return `[${key}](/explore/docs/${key})`;
-  });
+  // Resolve wikilinks against the whole namespace (docs, work, agents, templates,
+  // loops) instead of blindly pointing every one at /explore/docs — a work item's
+  // body is mostly `[[work-NNN]]` / `[[adr-NNN]]` cross-references, which the old
+  // rule sent to 404ing doc URLs.
+  const linked = linkifyWikilinks(body, await buildLinkIndex());
   return { item, html: await marked.parse(linked) };
 }

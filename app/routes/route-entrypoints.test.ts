@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { loader as healthzLoader } from "./healthz";
 import { action as employeePreviewAction } from "./org-employee-preview";
 import { action as templatePreviewAction } from "./org-template-preview";
-import { action as settingsAction, loader as settingsLoader } from "./settings";
+import { loader as settingsRedirect } from "./settings";
 import { action as threadAction, loader as threadLoader } from "./thread";
 import { action as threadsAction, loader as threadsLoader } from "./threads";
 import { action as archiveAction, loader as archiveLoader } from "./threads-archive";
@@ -196,44 +196,15 @@ describe("route: archive / restore threads (work-049)", () => {
   });
 });
 
-describe("route: /settings (work-018 model picker)", () => {
-  it("loader returns the catalog and the effective chat model", async () => {
-    const data = await settingsLoader({} as never);
-    expect(Array.isArray(data.models)).toBe(true);
-    expect(typeof data.effective).toBe("string");
-    expect(data.effective.length).toBeGreaterThan(0);
-  });
-
-  it("action rejects an id not in the catalog", async () => {
-    const form = new FormData();
-    form.set("chatModel", "claude-not-a-real-model");
-    const res = (await settingsAction({
-      request: new Request("http://localhost/settings", { method: "POST", body: form }),
-    } as never)) as { ok: boolean };
-    expect(res.ok).toBe(false);
-  });
-
-  it("action persists a valid catalog id and it drives resolution", async () => {
-    const form = new FormData();
-    form.set("chatModel", "claude-opus-4-8"); // present in both live catalog and fallback
-    const res = (await settingsAction({
-      request: new Request("http://localhost/settings", { method: "POST", body: form }),
-    } as never)) as { ok: boolean };
-    expect(res.ok).toBe(true);
-    const data = await settingsLoader({} as never);
-    expect(data.effective).toBe("claude-opus-4-8");
-    expect(data.effectiveSource).toBe("persisted");
-  });
-
-  it("action resets to default when __default__ is chosen", async () => {
-    const form = new FormData();
-    form.set("chatModel", "__default__");
-    const res = (await settingsAction({
-      request: new Request("http://localhost/settings", { method: "POST", body: form }),
-    } as never)) as { ok: boolean };
-    expect(res.ok).toBe(true);
-    const data = await settingsLoader({} as never);
-    expect(data.effectiveSource).not.toBe("persisted");
+describe("route: /settings (legacy redirect)", () => {
+  // The model picker this route once hosted configured the in-app assistant retired in
+  // ADR-019; the nav entry is gone and /settings now redirects to Org (where each
+  // agent/template's model preset is shown). Model resolution itself stays covered by
+  // models.server.test.ts.
+  it("redirects to /explore/agents", () => {
+    const res = settingsRedirect() as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/explore/agents");
   });
 });
 

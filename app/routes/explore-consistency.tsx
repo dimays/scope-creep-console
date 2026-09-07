@@ -21,6 +21,17 @@ type Item = { key: string; label: string; to?: string };
 
 export default function Consistency({ loaderData }: Route.ComponentProps) {
   const { report, inputChecks } = loaderData;
+  // The honest headline count: every genuinely-flagged item across all checks. A
+  // wikilink resolves against the whole namespace (docs/work/agents/templates/loops),
+  // so only real drift lands here — not the hundreds of cross-references that resolve.
+  const flagged =
+    inputChecks.gaps.length +
+    inputChecks.dups.length +
+    report.versionSkew.length +
+    report.ungeneratedRegistries.length +
+    report.proposedDocs.length +
+    report.danglingLinks.length +
+    report.staleDocs.length;
   return (
     <main className="console">
       <header className="console__header">
@@ -28,11 +39,14 @@ export default function Consistency({ loaderData }: Route.ComponentProps) {
           <p className="console__eyebrow">What's out of sync</p>
           <h1 className="console__title">Consistency</h1>
         </div>
+        <p className="console__meta">{flagged === 0 ? "all clear" : `${flagged} to review`}</p>
       </header>
       <ExploreNav />
 
       {report.ok && inputChecks.ok && (
-        <p className="console__notice">Everything checks out — nothing out of sync.</p>
+        <p className="console__notice console__notice--ok">
+          Everything checks out — nothing out of sync.
+        </p>
       )}
 
       {/* Human-Input Log self-checks (work-022): does the record match reality? */}
@@ -91,7 +105,7 @@ export default function Consistency({ loaderData }: Route.ComponentProps) {
       />
       <Section
         title="Dangling wikilinks"
-        hint="A link to a doc that doesn't exist yet — sometimes intentional (a marker for future work)."
+        hint="A [[link]] that resolves to nothing in the whole namespace — not a doc, work item, agent, template, or loop. Sometimes intentional (a marker for future work)."
         empty="Every wikilink resolves."
         items={report.danglingLinks.map((link, i) => ({
           key: `${link.from}-${link.target}-${i}`,
