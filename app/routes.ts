@@ -29,8 +29,10 @@ export default [
   route("explore/loops", "routes/explore-loops.tsx"),
   route("explore/loops/:name", "routes/explore-loop.tsx"),
   route("explore/timeline", "routes/explore-timeline.tsx"),
-  // Console operations surfaces (prd-console-operations): Releases (work-054),
-  // Roadmap (work-056) — read-only projections of the control-plane artifacts.
+  // Console operations surfaces (prd-console-operations): Schedules (work-052),
+  // Releases (work-054), Roadmap (work-056) — read-only projections of the
+  // control-plane artifacts + registry/routines.json + the ledger.
+  route("explore/schedules", "routes/explore-schedules.tsx"),
   route("explore/releases", "routes/explore-releases.tsx"),
   route("explore/roadmap", "routes/explore-roadmap.tsx"),
   route("explore/consistency", "routes/explore-consistency.tsx"),

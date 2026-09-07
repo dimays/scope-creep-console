@@ -6,7 +6,9 @@ import { loader as loopLoader } from "../routes/explore-loop";
 import { loader as loopsLoader } from "../routes/explore-loops";
 import {
   buildLinkIndex,
+  cadenceHistoryFor,
   consistency,
+  describeCron,
   extractWikilinks,
   listDocs,
   listLedger,
@@ -14,10 +16,12 @@ import {
   listReleases,
   listRoadmap,
   loopsOwnedBy,
+  parseCadenceDecisions,
   parseFrontmatter,
   parseLoops,
   readAgent,
   readLoop,
+  readRoutines,
   versionSkew,
 } from "./explore.server";
 
@@ -403,5 +407,120 @@ describe("listReleases / listRoadmap: newest-first, template-excluded projection
     const index = await buildLinkIndex();
     expect(index.docs.has("release-002")).toBe(true);
     expect(index.docs.has("release-000-template")).toBe(false);
+  });
+});
+
+// Schedules surface (work-052): the cron describer, cadence-decision parser, and
+// routines reader — pure/tolerant so "empty is empty" holds before any loop has run.
+describe("schedules: describeCron / parseCadenceDecisions", () => {
+  it("describes the routines' crons in human terms", () => {
+    expect(describeCron("0 14 * * 1")).toBe("Mondays at 14:00 UTC");
+    expect(describeCron("0 14 1,15 * *")).toBe("the 1st & 15th of each month at 14:00 UTC");
+    expect(describeCron("0 14 1 * *")).toBe("the 1st of each month at 14:00 UTC");
+    expect(describeCron("0 0 * * *")).toBe("daily at 00:00 UTC");
+  });
+
+  it("returns the raw expression for shapes it can't read", () => {
+    expect(describeCron("*/30 * * * *")).toBe("*/30 * * * *");
+    expect(describeCron("nonsense")).toBe("nonsense");
+  });
+
+  it("parses cadence-decision YAML blocks, tolerant of none", () => {
+    expect(parseCadenceDecisions("# just prose, no block\n")).toEqual([]);
+    const md = [
+      "# Ledger entry",
+      "```yaml",
+      "cadence-decision:",
+      "  loop: staffing-review",
+      "  ran_at: 2026-09-07",
+      "  trigger: scheduled",
+      "  decision: hold",
+      "  next_cadence_days: 14",
+      '  reason: "first run; nominal cadence"',
+      "```",
+    ].join("\n");
+    expect(parseCadenceDecisions(md)).toEqual([
+      {
+        loop: "staffing-review",
+        ranAt: "2026-09-07",
+        trigger: "scheduled",
+        decision: "hold",
+        nextCadenceDays: 14,
+        reason: "first run; nominal cadence",
+      },
+    ]);
+  });
+});
+
+describe("readRoutines / cadenceHistoryFor: tolerant reads", () => {
+  let home: string;
+  let prev: string | undefined;
+
+  beforeAll(() => {
+    prev = process.env.SCOPE_CREEP_HOME;
+    home = mkdtempSync(join(tmpdir(), "scope-creep-routines-"));
+    mkdirSync(join(home, "registry"));
+    mkdirSync(join(home, "ledger"));
+    writeFileSync(
+      join(home, "registry", "routines.json"),
+      JSON.stringify({
+        manage_all_url: "https://claude.ai/code/routines",
+        routines: [
+          {
+            name: "Staffing review",
+            loop: "staffing-review",
+            trigger_id: "trig_abc",
+            cron: "0 14 * * 1",
+            cadence_bounds_days: [7, 42],
+            model: "claude-sonnet-5",
+            manage_url: "https://claude.ai/code/routines/trig_abc",
+            status: "active",
+          },
+        ],
+      }),
+    );
+    writeFileSync(
+      join(home, "ledger", "010-staffing.md"),
+      [
+        "# staffing run",
+        "```yaml",
+        "cadence-decision:",
+        "  loop: staffing-review",
+        "  ran_at: 2026-09-14",
+        "  decision: lengthen",
+        "  next_cadence_days: 21",
+        "```",
+      ].join("\n"),
+    );
+    process.env.SCOPE_CREEP_HOME = home;
+  });
+
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prev;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("reads routines with bounds + manage url", async () => {
+    const { routines, manageAllUrl } = await readRoutines();
+    expect(manageAllUrl).toBe("https://claude.ai/code/routines");
+    expect(routines).toHaveLength(1);
+    expect(routines[0]).toMatchObject({
+      loop: "staffing-review",
+      triggerId: "trig_abc",
+      cadenceBoundsDays: [7, 42],
+      manageUrl: "https://claude.ai/code/routines/trig_abc",
+    });
+  });
+
+  it("collects a loop's cadence history from the ledger", async () => {
+    const history = await cadenceHistoryFor("staffing-review");
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      ranAt: "2026-09-14",
+      decision: "lengthen",
+      nextCadenceDays: 21,
+    });
+    expect(await cadenceHistoryFor("evolve")).toEqual([]);
   });
 });
