@@ -6,6 +6,7 @@ import { loader as loopLoader } from "../routes/explore-loop";
 import { loader as loopsLoader } from "../routes/explore-loops";
 import {
   activityForActor,
+  activityForThread,
   activityHref,
   activityVerb,
   buildLinkIndex,
@@ -472,7 +473,7 @@ describe("listActivity / activityForActor (hermetic)", () => {
     writeFileSync(
       join(home, "activity", "2026-09.ndjson"),
       [
-        '{"ts":"2026-09-07T05:00:00Z","actor":"chief-of-staff","type":"delegate","summary":"to ada"}',
+        '{"ts":"2026-09-07T05:00:00Z","actor":"chief-of-staff","type":"delegate","summary":"to ada","threadId":7}',
         "", // blank line tolerated
         "garbage-not-json",
         '{"ts":"2026-09-07T06:00:00Z","actor":"cto","type":"spawn","summary":"linus"}',
@@ -495,6 +496,11 @@ describe("listActivity / activityForActor (hermetic)", () => {
   it("filters to one actor", async () => {
     expect((await activityForActor("cto")).map((e) => e.summary)).toEqual(["linus"]);
     expect(await activityForActor("nobody")).toEqual([]);
+  });
+
+  it("filters to one thread (work-031)", async () => {
+    expect((await activityForThread(7)).map((e) => e.summary)).toEqual(["to ada"]);
+    expect(await activityForThread(999)).toEqual([]);
   });
 });
 
