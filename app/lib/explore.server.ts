@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { marked } from "marked";
+import { buildCliCommand, buildDeepLink, buildOpenRepoLink } from "./claude-sessions";
 import { agentDisplayName, DISPLAY_NAMES } from "./display-name";
 import { type TicketRef, ticketsFor } from "./org.server";
 import { readRegistry } from "./registry.server";
@@ -283,6 +284,192 @@ export async function listRoadmap(): Promise<ArtifactEntry[]> {
 }
 
 export { agentDisplayName };
+
+// --- schedules: cloud routines + self-tuning cadence (work-052) -----------
+
+export type RoutineRecord = {
+  name: string;
+  loop: string;
+  triggerId: string;
+  cron: string;
+  cadenceBoundsDays?: [number, number];
+  model?: string;
+  status?: string;
+  /** The claude.ai deep link where the routine is actually managed ([[adr-016]]:
+   *  enable/disable/run-now happen THERE, never in-app). */
+  manageUrl: string;
+};
+
+/**
+ * The TIME-SCHEDULED cloud routines from `registry/routines.json` (hand-maintained;
+ * the system of record is claude.ai, not this repo — [[work-051]]). Tolerant: a
+ * missing/unreadable/malformed file, or a routine without a loop, reads as empty so
+ * "empty is empty" holds and no schedule is fabricated. Returns the manage-all link too.
+ */
+export async function readRoutines(): Promise<{
+  routines: RoutineRecord[];
+  manageAllUrl: string;
+}> {
+  const fallback = {
+    routines: [] as RoutineRecord[],
+    manageAllUrl: "https://claude.ai/code/routines",
+  };
+  const src = await readMd(join("registry", "routines.json"));
+  if (src === null) return fallback;
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(src);
+  } catch {
+    return fallback;
+  }
+  const raw = Array.isArray(parsed.routines) ? parsed.routines : [];
+  const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+  const routines = raw
+    .map((r) => {
+      const o = r as Record<string, unknown>;
+      const bounds = Array.isArray(o.cadence_bounds_days)
+        ? (o.cadence_bounds_days.filter((n) => typeof n === "number") as number[])
+        : [];
+      return {
+        name: str(o.name) ?? "",
+        loop: str(o.loop) ?? "",
+        triggerId: str(o.trigger_id) ?? "",
+        cron: str(o.cron) ?? "",
+        cadenceBoundsDays:
+          bounds.length === 2 ? ([bounds[0], bounds[1]] as [number, number]) : undefined,
+        model: str(o.model),
+        status: str(o.status),
+        manageUrl:
+          str(o.manage_url) ??
+          (str(o.trigger_id)
+            ? `https://claude.ai/code/routines/${str(o.trigger_id)}`
+            : fallback.manageAllUrl),
+      };
+    })
+    .filter((r) => r.loop !== "");
+  return {
+    routines,
+    manageAllUrl: str(parsed.manage_all_url) ?? fallback.manageAllUrl,
+  };
+}
+
+export type CadenceDecision = {
+  loop?: string;
+  ranAt?: string;
+  /** `scheduled` | `ad-hoc` — how this run was triggered. */
+  trigger?: string;
+  /** `lengthen` | `shorten` | `hold` — how the cadence moved. */
+  decision?: string;
+  nextCadenceDays?: number;
+  reason?: string;
+};
+
+/**
+ * Parse the `cadence-decision` YAML blocks a self-tuning loop appends to its ledger
+ * entry each run ([[ledger-043-staffing-cadence-self-tuning]]: trigger, signals,
+ * decision, next_cadence_days, reason). Pure + unit-tested; tolerant by design so
+ * "empty is empty" holds — a ledger with no such block yields []. Any fenced block
+ * mentioning `next_cadence_days` (or `cadence-decision`) is treated as one.
+ */
+export function parseCadenceDecisions(md: string): CadenceDecision[] {
+  const out: CadenceDecision[] = [];
+  for (const m of md.matchAll(/```[a-z]*\n([\s\S]*?)```/g)) {
+    const block = m[1];
+    if (!/cadence-decision|next_cadence_days/.test(block)) continue;
+    const get = (k: string): string | undefined =>
+      new RegExp(`(?:^|\\n)\\s*${k}:\\s*"?([^"\\n]+)"?`).exec(block)?.[1]?.trim();
+    const days = get("next_cadence_days");
+    out.push({
+      loop: get("loop"),
+      ranAt: get("ran_at"),
+      trigger: get("trigger"),
+      decision: get("decision"),
+      nextCadenceDays: days && /^\d+$/.test(days) ? Number(days) : undefined,
+      reason: get("reason"),
+    });
+  }
+  return out;
+}
+
+/** The cadence-decision history for one loop, newest run first, across the ledger. */
+export async function cadenceHistoryFor(loopName: string): Promise<CadenceDecision[]> {
+  let files: string[];
+  try {
+    files = await readdir(join(home(), "ledger"));
+  } catch {
+    return [];
+  }
+  const out: CadenceDecision[] = [];
+  for (const file of files) {
+    if (!file.endsWith(".md")) continue;
+    const src = await readMd(join("ledger", file));
+    if (src === null) continue;
+    for (const d of parseCadenceDecisions(src)) {
+      if (d.loop === loopName) out.push(d);
+    }
+  }
+  return out.sort((a, b) => (b.ranAt ?? "").localeCompare(a.ranAt ?? ""));
+}
+
+const CRON_DOW = [
+  "Sundays",
+  "Mondays",
+  "Tuesdays",
+  "Wednesdays",
+  "Thursdays",
+  "Fridays",
+  "Saturdays",
+];
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
+}
+
+/**
+ * A human-readable description of the fixed cron fire (the "next cron check" the
+ * ticket asks for, stated as the schedule rather than a computed Date — no cron-date
+ * dependency to drift). Handles the numeric minute/hour + day-of-week / day-of-month
+ * forms the routines use; falls back to the raw expression for anything it can't read.
+ */
+export function describeCron(cron: string): string {
+  const p = cron.trim().split(/\s+/);
+  if (p.length !== 5) return cron;
+  const [min, hour, dom, , dow] = p;
+  if (!/^\d+$/.test(min) || !/^\d+$/.test(hour)) return cron;
+  const time = `${hour.padStart(2, "0")}:${min.padStart(2, "0")} UTC`;
+  if (dow !== "*") {
+    const days = dow
+      .split(",")
+      .map((d) => (/^\d+$/.test(d) ? (CRON_DOW[Number(d) % 7] ?? d) : d))
+      .join(" & ");
+    return `${days} at ${time}`;
+  }
+  if (dom !== "*") {
+    const dates = dom
+      .split(",")
+      .map((d) => (/^\d+$/.test(d) ? ordinal(Number(d)) : d))
+      .join(" & ");
+    return `the ${dates} of each month at ${time}`;
+  }
+  return `daily at ${time}`;
+}
+
+export type LoopLaunch = { deepLink: string; cliCommand: string; openRepoLink: string };
+
+/** "Open in Claude" launch info for running an event-driven loop by hand — same
+ *  claude:// scheme as Threads (work-046), seeded to run the named loop. Zero Claude
+ *  calls; it's an OS URL launch or a copyable command. */
+export function loopLaunch(loopName: string): LoopLaunch {
+  const cwd = home();
+  const prompt = `Run the ${loopName} loop per loops/${loopName}.md. Read AGENTS.md and the loop definition first.`;
+  return {
+    deepLink: buildDeepLink({ cwd, prompt }),
+    cliCommand: buildCliCommand({ cwd, prompt }),
+    openRepoLink: buildOpenRepoLink(cwd),
+  };
+}
 
 // --- loops (registry/loops.json) -----------------------------------------
 

@@ -10,6 +10,7 @@ import {
   listLoops,
   listReleases,
   listRoadmap,
+  readRoutines,
 } from "~/lib/explore.server";
 import { readRegistry } from "~/lib/registry.server";
 import type { Route } from "./+types/explore";
@@ -20,7 +21,7 @@ export function meta(_: Route.MetaArgs) {
 
 export async function loader(_: Route.LoaderArgs) {
   await ensureSchema();
-  const [docs, ledger, loops, registry, report, feedbackRows, releases, roadmap] =
+  const [docs, ledger, loops, registry, report, feedbackRows, releases, roadmap, routines] =
     await Promise.all([
       listDocs(),
       listLedger(),
@@ -30,6 +31,7 @@ export async function loader(_: Route.LoaderArgs) {
       db.select().from(feedback),
       listReleases(),
       listRoadmap(),
+      readRoutines(),
     ]);
   return {
     counts: {
@@ -39,6 +41,7 @@ export async function loader(_: Route.LoaderArgs) {
       ledger: ledger.length,
       releases: releases.length,
       roadmap: roadmap.length,
+      schedules: routines.routines.length,
     },
     issues:
       report.danglingLinks.length +
@@ -67,6 +70,9 @@ export default function Explore({ loaderData }: Route.ComponentProps) {
         </ExploreCard>
         <ExploreCard to="/explore/loops" title="Loops" count={counts.loops}>
           The governed procedures the org runs, linked to their owners.
+        </ExploreCard>
+        <ExploreCard to="/explore/schedules" title="Schedules" count={counts.schedules}>
+          What runs on a cadence — cron floor, self-tuning bounds, managed in claude.ai.
         </ExploreCard>
         <ExploreCard to="/explore/releases" title="Releases" count={counts.releases}>
           What the org has shipped, newest first, linking to the PRs and tickets.
