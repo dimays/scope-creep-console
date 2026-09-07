@@ -6,6 +6,8 @@ const LINKS = [
   { to: "/explore/templates", label: "Templates", end: false },
   { to: "/explore/docs", label: "Docs", end: false },
   { to: "/explore/loops", label: "Loops", end: false },
+  { to: "/explore/releases", label: "Releases", end: false },
+  { to: "/explore/roadmap", label: "Roadmap", end: false },
   { to: "/explore/timeline", label: "Timeline", end: false },
   { to: "/explore/consistency", label: "Consistency", end: false },
 ];
