@@ -448,6 +448,37 @@ a.console__item-name:hover {
   }
 }
 
+/* Mobile (the Owner drives from a phone): the explore surfaces are built with
+   horizontal `.doc-row`s that pack a name + several tags + a link. On a narrow
+   viewport those must WRAP, not push the page wider than the screen (which was
+   clipping prose and stranding the ACTIVE / "Manage in claude.ai" bits off-screen). */
+@media (max-width: 640px) {
+  .console {
+    padding: 2rem 1rem;
+  }
+  /* Stack every row's parts vertically — the surest way to never exceed the width,
+     since a long cron string + a nowrap tag on one line was still overflowing. */
+  .doc-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+  }
+  /* margin-left:auto (used to right-pin a tag on desktop) must not push it off-screen
+     in a column; reset it so it sits left under the name. */
+  .doc-row .console__tag,
+  .doc-row .console__meta {
+    margin-left: 0;
+  }
+  .console__panel-head {
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+  }
+  /* Belt-and-suspenders: nothing may force a horizontal scrollbar on a phone. */
+  body {
+    overflow-x: hidden;
+  }
+}
+
 .board__col {
   background: color-mix(in srgb, var(--sc-surface) 55%, transparent);
   border: 1px solid var(--sc-border);
