@@ -27,8 +27,8 @@ export default function ExploreSchedules({ loaderData }: Route.ComponentProps) {
           <p className="console__eyebrow">Scope Creep</p>
           <h1 className="console__title">Schedules</h1>
         </div>
-        <Link to="/explore" className="console__meta">
-          ← explore
+        <Link to="/" className="console__meta">
+          ← overview
         </Link>
       </header>
       <ExploreNav />
@@ -49,25 +49,48 @@ export default function ExploreSchedules({ loaderData }: Route.ComponentProps) {
             <code>registry/routines.json</code>, it appears here.
           </p>
         ) : (
-          <ul className="console__list">
+          <section className="console__grid">
             {routines.map((r) => (
-              <li key={r.triggerId} className="doc-row schedule-row">
-                <Link to={`/explore/loops/${r.loop}`} className="console__item-name">
-                  {r.name}
-                </Link>
-                <span className="console__meta">{r.cronText}</span>
-                {r.cadenceBoundsDays && (
-                  <span className="console__tag">
-                    self-tunes {r.cadenceBoundsDays[0]}–{r.cadenceBoundsDays[1]}d
-                  </span>
-                )}
-                {r.status && <span className="console__tag">{r.status}</span>}
-                <a href={r.manageUrl} target="_blank" rel="noreferrer" className="console__meta">
+              <article key={r.triggerId} className="console__panel schedule-card">
+                <div className="console__panel-head">
+                  <h3 className="console__panel-title">
+                    <Link to={`/explore/loops/${r.loop}`} className="console__item-name">
+                      {r.name}
+                    </Link>
+                  </h3>
+                  {r.status && (
+                    <span className={`status-pill status-pill--${r.status}`}>{r.status}</span>
+                  )}
+                </div>
+                <dl className="schedule-card__meta">
+                  <dt>Cadence</dt>
+                  <dd>{r.cronText}</dd>
+                  {r.cadenceBoundsDays && (
+                    <>
+                      <dt>Self-tunes</dt>
+                      <dd>
+                        {r.cadenceBoundsDays[0]}–{r.cadenceBoundsDays[1]} days
+                      </dd>
+                    </>
+                  )}
+                  {r.model && (
+                    <>
+                      <dt>Model</dt>
+                      <dd className="schedule-card__model">{r.model}</dd>
+                    </>
+                  )}
+                </dl>
+                <a
+                  href={r.manageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="schedule-card__manage"
+                >
                   Manage in claude.ai ↗
                 </a>
-              </li>
+              </article>
             ))}
-          </ul>
+          </section>
         )}
       </section>
 

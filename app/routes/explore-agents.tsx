@@ -100,40 +100,56 @@ export default function ExploreAgents({ loaderData }: Route.ComponentProps) {
 }
 
 function ExecNode({ exec }: { exec: OrgExec }) {
+  const reports = exec.employees.length;
   return (
-    <li className="org__exec">
-      <div className="org__exec-head">
-        <Link to={`/explore/agents/${exec.name}`} className="org__exec-name">
-          {agentDisplayName(exec.name)}
-        </Link>
-        <span className="org__tier-tag org__tier-tag--exec">executive</span>
-        <span className="org__counts">
-          {exec.employees.length} report{exec.employees.length === 1 ? "" : "s"} ·{" "}
-          {exec.ownedTicketCount} owned · {exec.staffedTicketCount} staffed
-        </span>
-      </div>
-      {exec.employees.length === 0 ? (
-        <p className="console__empty org__empty">No employees spun up yet.</p>
-      ) : (
-        <ul className="org__reports">
-          {exec.employees.map((emp) => (
-            <li key={emp.name} className="org__report">
-              <div className="org__report-head">
-                <EmployeeName emp={emp} />
-                <EmployeeStatus status={emp.status} />
-                {emp.template && (
-                  <Link to={`/explore/templates/${emp.template}`} className="console__tag org__tpl">
-                    {emp.template}
-                  </Link>
-                )}
-                {emp.defaultModel && <ModelBadge id={emp.defaultModel} override />}
-              </div>
-              <TicketChips tickets={emp.tickets} emptyLabel="available — not staffed" />
-            </li>
-          ))}
-        </ul>
-      )}
-      <SummonCatalog templates={exec.templates} />
+    <li>
+      {/* Collapsible exec card — open by default so the whole org reads at a glance;
+          collapse to keep it scannable as headcount grows (#2). */}
+      <details className="org-exec" open>
+        <summary className="org-exec__summary">
+          <span className="org-exec__chevron" aria-hidden="true">
+            ▶
+          </span>
+          <Link to={`/explore/agents/${exec.name}`} className="org-exec__name">
+            {agentDisplayName(exec.name)}
+          </Link>
+          <span className="org__tier-tag org__tier-tag--exec">executive</span>
+          <span className="org-exec__counts">
+            {reports} report{reports === 1 ? "" : "s"} · {exec.ownedTicketCount} owned ·{" "}
+            {exec.staffedTicketCount} staffed
+          </span>
+        </summary>
+        <div className="org-exec__body">
+          {reports === 0 ? (
+            <p className="console__empty org__empty">No employees spun up yet.</p>
+          ) : (
+            <>
+              <p className="org-exec__section-label">Report{reports === 1 ? "" : "s"}</p>
+              <ul className="org__reports">
+                {exec.employees.map((emp) => (
+                  <li key={emp.name} className="org__report">
+                    <div className="org__report-head">
+                      <EmployeeName emp={emp} />
+                      <EmployeeStatus status={emp.status} />
+                      {emp.template && (
+                        <Link
+                          to={`/explore/templates/${emp.template}`}
+                          className="console__tag org__tpl"
+                        >
+                          {emp.template}
+                        </Link>
+                      )}
+                      {emp.defaultModel && <ModelBadge id={emp.defaultModel} override />}
+                    </div>
+                    <TicketChips tickets={emp.tickets} emptyLabel="available — not staffed" />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <SummonCatalog templates={exec.templates} />
+        </div>
+      </details>
     </li>
   );
 }

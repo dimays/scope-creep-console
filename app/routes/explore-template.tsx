@@ -40,7 +40,7 @@ export default function ExploreTemplate({ loaderData }: Route.ComponentProps) {
       {t.skills.length > 0 && (
         <p className="org__skills">
           {t.skills.map((s) => (
-            <span key={s} className="console__tag">
+            <span key={s} className="skill-chip">
               {s}
             </span>
           ))}

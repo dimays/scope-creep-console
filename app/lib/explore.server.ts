@@ -423,6 +423,10 @@ export type ArtifactEntry = {
   order: number;
   /** The `**Date:**` / `**Date range:**` line from the body, if present. */
   date?: string;
+  /** Releases only: the `**Scope:**` line — which package/area the release covers. */
+  scope?: string;
+  /** Releases only: the semver (e.g. `v0.2.0`) read from the H1 or `**Version:**` line. */
+  version?: string;
   file: string;
 };
 
@@ -446,16 +450,56 @@ async function listArtifacts(dir: string): Promise<ArtifactEntry[]> {
     const src = await readMd(join(dir, file));
     if (src === null) continue;
     const { fm, body } = parseFrontmatter(src);
+    const title = firstHeading(body, fm.name ?? file.replace(/\.md$/, ""));
+    const scope = /\*\*Scope:\*\*\s*(.+)/.exec(body)?.[1]?.trim();
+    // Prefer the version in the H1 (e.g. "… — v0.2.0 (…)"); fall back to the body's
+    // `**Version:**` line. Stored bare (no leading "v") so callers can render it freely.
+    const version =
+      /\bv(\d+\.\d+\.\d+)/.exec(title)?.[1] ??
+      /\*\*Version:\*\*\s*v?(\d+\.\d+\.\d+)/.exec(body)?.[1];
     out.push({
       slug: fm.name ?? join(dir, file).replace(/[/.]/g, "-"),
-      title: firstHeading(body, fm.name ?? file.replace(/\.md$/, "")),
+      title,
       description: fm.description ?? "",
       order: Number.parseInt(file, 10) || 0,
       date: /\*\*Date(?:\s+range)?:\*\*\s*(.+)/.exec(body)?.[1]?.trim(),
+      scope,
+      version,
       file,
     });
   }
   return out.sort((a, b) => b.order - a.order);
+}
+
+/** How significant a release is, from its semver: X.0.0 = major, X.Y.0 = minor,
+ *  else patch. Drives the version badge's emphasis on the Releases surface (#7). */
+export type ReleaseTier = "major" | "minor" | "patch";
+export function releaseTier(version?: string): ReleaseTier | undefined {
+  const m = /(\d+)\.(\d+)\.(\d+)/.exec(version ?? "");
+  if (!m) return undefined;
+  const [, , minor, patch] = m;
+  if (patch !== "0") return "patch";
+  if (minor !== "0") return "minor";
+  return "major";
+}
+
+/** The package/area a release covers, derived from its free-text `**Scope:**` line,
+ *  so the Releases surface can group by package (#7). Recognizes the known repos and
+ *  falls back to the leading clause of the scope text. */
+export type ReleasePackage = { key: string; label: string };
+export function releasePackage(scope?: string): ReleasePackage {
+  const s = (scope ?? "").toLowerCase();
+  // An explicit package slug in parentheses wins, e.g. "(scope-creep-console)".
+  const slug = /\((scope-creep[a-z0-9-]*)\)/.exec(s)?.[1] ?? "";
+  const hit = slug || s;
+  if (/ext-|extension/.test(hit)) return { key: "extensions", label: "Extensions" };
+  if (/console/.test(hit)) return { key: "console", label: "Console" };
+  if (/design/.test(hit)) return { key: "design", label: "Design system" };
+  if (/control-plane|core|scope-creep/.test(hit)) {
+    return { key: "scope-creep", label: "Scope Creep core" };
+  }
+  const fallback = (scope ?? "").split(/[—,(]/)[0]?.trim();
+  return { key: fallback ? fallback.toLowerCase() : "other", label: fallback || "Other" };
 }
 
 /** Control-plane release-notes entries, newest first (work-054). */
@@ -467,6 +511,121 @@ export async function listReleases(): Promise<ArtifactEntry[]> {
  *  list is the latest presentation; the tail is the supersession history. */
 export async function listRoadmap(): Promise<ArtifactEntry[]> {
   return listArtifacts("roadmap");
+}
+
+// --- roadmap deck parsing: the forward plan, for the "where we're headed" strip (#8) ---
+
+/** One board-deck theme: its title and the executive owners named in the heading. */
+export type RoadmapTheme = { title: string; owners: string[] };
+export type RoadmapDeck = {
+  themes: RoadmapTheme[];
+  /** The `**Horizon:**` line, if the deck declares one. */
+  horizon?: string;
+  /** A normalized disposition label (Accepted | Revised | Deferred | Pending). */
+  disposition?: string;
+};
+
+function normalizeDisposition(line: string): string | undefined {
+  // The disposition line names the *options* in a parenthetical (e.g. "_Pending the
+  // Owner_ (accepted / revised / deferred)"), so match only the head clause before
+  // "(" — otherwise a still-Pending deck reads as Accepted off its own option list.
+  const s = (line.split("(")[0] ?? "").toLowerCase();
+  if (s.includes("pending")) return "Pending";
+  if (s.includes("accept")) return "Accepted";
+  if (s.includes("revis")) return "Revised";
+  if (s.includes("defer")) return "Deferred";
+  return undefined;
+}
+
+/**
+ * Parse a roadmap presentation's markdown into its forward-looking spine: the
+ * `### Theme N: <title> ([[owner]] · …)` headings, the optional `**Horizon:**`,
+ * and the `## Disposition` status. Pure + unit-tested. Everything is optional so
+ * a deck that omits a section (or a malformed one) degrades to empty, never invents.
+ */
+export function parseRoadmapDeck(md: string): RoadmapDeck {
+  const themes: RoadmapTheme[] = [];
+  const re = /^###\s+Theme[^:]*:\s*(.+?)\s*$/gm;
+  let m: RegExpExecArray | null = re.exec(md);
+  while (m !== null) {
+    const raw = m[1];
+    const owners = [...raw.matchAll(/\[\[([^\]]+)\]\]/g)].map((o) => o[1]);
+    const title = raw.replace(/\s*\(.*\)\s*$/, "").trim();
+    if (title) themes.push({ title, owners });
+    m = re.exec(md);
+  }
+  // Keep the horizon to its lead clause (before an em/en dash) so the strip's label
+  // stays a short phrase — e.g. "the next build cycle (~the coming weeks)".
+  const horizon = /\*\*Horizon:\*\*\s*(.+)/
+    .exec(md)?.[1]
+    ?.split(/\s+[—–-]\s+/)[0]
+    ?.trim();
+  const dispSection = /##\s+Disposition\s*\n([\s\S]*?)(?:\n#{1,2}\s|$)/.exec(md)?.[1] ?? "";
+  const dispLine =
+    dispSection
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? "";
+  return { themes, horizon, disposition: normalizeDisposition(dispLine) };
+}
+
+/** The latest roadmap presentation with its parsed forward plan, or null when
+ *  none exists. Reads only the head of the (newest-first) roadmap list. */
+export async function readRoadmapDeck(): Promise<{
+  entry: ArtifactEntry;
+  deck: RoadmapDeck;
+} | null> {
+  const all = await listRoadmap();
+  const entry = all[0];
+  if (!entry) return null;
+  const src = await readMd(join("roadmap", entry.file));
+  if (src === null) return { entry, deck: { themes: [] } };
+  const { body } = parseFrontmatter(src);
+  return { entry, deck: parseRoadmapDeck(body) };
+}
+
+// --- release "Now" state: what the current milestone delivered + its honest gap (#8) ---
+
+/** Strip the markdown a release body carries (wikilinks, emphasis, code spans) so a
+ *  sentence can render as plain text in the compact Roadmap "Now" card. */
+function stripInlineMd(s: string): string {
+  return s
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
+    .replace(/\[\[([^\]]+)\]\]/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The first `n` sentences of a block, markdown stripped — keeps the "Now" card terse. */
+function firstSentences(text: string, n: number): string {
+  const clean = stripInlineMd(text);
+  const parts = clean.match(/[^.!?]+[.!?]+(\s|$)/g);
+  return (parts ? parts.slice(0, n).join(" ") : clean).trim();
+}
+
+/** What the current release delivered ("milestone") and the shortcoming it carries
+ *  forward ("residual"), for the Roadmap "Now" card — drawn from the release notes so
+ *  the card stays honest and non-repetitive with the deck. */
+export type ReleaseNow = { milestone?: string; residual?: string };
+export function parseReleaseNow(md: string): ReleaseNow {
+  const highlights = /##\s+Highlights\s*\n([\s\S]*?)(?=\n##\s|$)/.exec(md)?.[1]?.trim();
+  const milestone = highlights ? firstSentences(highlights, 1) : undefined;
+  const residualRaw = /\*\*Honest residual:\*\*\s*([\s\S]*?)(?=\n\s*-\s|\n\s*\n|\n##\s|$)/.exec(
+    md,
+  )?.[1];
+  const residual = residualRaw ? firstSentences(residualRaw, 1) : undefined;
+  return { milestone, residual };
+}
+
+/** The newest release's "Now" state, or null when there is no release to read. */
+export async function readReleaseNow(): Promise<ReleaseNow | null> {
+  const latest = (await listReleases())[0];
+  if (!latest) return null;
+  const src = await readMd(join("releases", latest.file));
+  if (src === null) return null;
+  const { body } = parseFrontmatter(src);
+  return parseReleaseNow(body);
 }
 
 export { agentDisplayName };

@@ -26,8 +26,8 @@ export default function ExploreLoops({ loaderData }: Route.ComponentProps) {
           <p className="console__eyebrow">Scope Creep</p>
           <h1 className="console__title">Loops</h1>
         </div>
-        <Link to="/explore" className="console__meta">
-          ← explore
+        <Link to="/" className="console__meta">
+          ← overview
         </Link>
       </header>
       <ExploreNav />
@@ -44,21 +44,31 @@ export default function ExploreLoops({ loaderData }: Route.ComponentProps) {
             here.
           </p>
         ) : (
-          <ul className="console__list">
+          <section className="console__grid">
             {loops.map((loop) => (
-              <li key={loop.name} className="doc-row">
-                <Link to={`/explore/loops/${loop.name}`} className="console__item-name">
-                  {loop.name}
-                </Link>
+              <article key={loop.name} className="console__panel loop-card">
+                <div className="console__panel-head">
+                  <h3 className="console__panel-title">
+                    <Link to={`/explore/loops/${loop.name}`} className="console__item-name">
+                      {loop.name}
+                    </Link>
+                  </h3>
+                  {loop.status && (
+                    <span className={`status-pill status-pill--${loop.status}`}>{loop.status}</span>
+                  )}
+                </div>
+                {loop.description && <p className="loop-card__desc">{loop.description}</p>}
                 {loop.ownerAgent && loop.ownerDisplay && (
-                  <Link to={`/explore/agents/${loop.ownerAgent}`} className="console__meta">
-                    {loop.ownerDisplay}
-                  </Link>
+                  <p className="loop-card__foot">
+                    Owned by{" "}
+                    <Link to={`/explore/agents/${loop.ownerAgent}`} className="loop-card__owner">
+                      {loop.ownerDisplay}
+                    </Link>
+                  </p>
                 )}
-                {loop.status && <span className="console__tag">{loop.status}</span>}
-              </li>
+              </article>
             ))}
-          </ul>
+          </section>
         )}
       </section>
     </main>

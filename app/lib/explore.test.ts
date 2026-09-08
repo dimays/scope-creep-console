@@ -26,9 +26,13 @@ import {
   parseCadenceDecisions,
   parseFrontmatter,
   parseLoops,
+  parseReleaseNow,
+  parseRoadmapDeck,
   readAgent,
   readLoop,
   readRoutines,
+  releasePackage,
+  releaseTier,
   versionSkew,
 } from "./explore.server";
 
@@ -96,6 +100,128 @@ describe("versionSkew", () => {
 
   it("ignores a source that couldn't be read (null)", () => {
     expect(versionSkew({ app: "0.15.0", pkg: null, changelog: "0.15.0" })).toEqual([]);
+  });
+});
+
+describe("releaseTier (semver → major/minor/patch)", () => {
+  it("classifies X.0.0 as major", () => {
+    expect(releaseTier("v1.0.0")).toBe("major");
+    expect(releaseTier("2.0.0")).toBe("major");
+  });
+  it("classifies X.Y.0 as minor", () => {
+    expect(releaseTier("v0.1.0")).toBe("minor");
+    expect(releaseTier("v0.2.0")).toBe("minor");
+  });
+  it("classifies X.Y.Z (Z>0) as patch", () => {
+    expect(releaseTier("v0.2.1")).toBe("patch");
+  });
+  it("returns undefined for a missing/unparseable version", () => {
+    expect(releaseTier(undefined)).toBeUndefined();
+    expect(releaseTier("dev")).toBeUndefined();
+  });
+});
+
+describe("releasePackage (scope → package group)", () => {
+  it("maps the control-plane / core scope to Scope Creep core", () => {
+    expect(releasePackage("control-plane (scope-creep)")).toEqual({
+      key: "scope-creep",
+      label: "Scope Creep core",
+    });
+  });
+  it("prefers an explicit package slug in parentheses", () => {
+    expect(releasePackage("companion polish in (scope-creep-console)").key).toBe("console");
+  });
+  it("recognizes console, design, and extensions", () => {
+    expect(releasePackage("the Console app").label).toBe("Console");
+    expect(releasePackage("the design system").label).toBe("Design system");
+    expect(releasePackage("scope-creep-ext-feedback").label).toBe("Extensions");
+  });
+  it("falls back to the leading clause of unknown scope text", () => {
+    expect(releasePackage("Widgets — some area").label).toBe("Widgets");
+  });
+  it("returns an Other bucket for empty scope", () => {
+    expect(releasePackage(undefined).key).toBe("other");
+  });
+});
+
+describe("parseRoadmapDeck (the forward plan)", () => {
+  const md = [
+    "# Roadmap Presentation 001",
+    "",
+    "- **Horizon:** next quarter",
+    "",
+    "## Themes",
+    "",
+    "### Theme 1: Finish the trust rails ([[cto]] · [[chief-reality-officer]])",
+    "Narrative one.",
+    "",
+    "### Theme 2: A Console that shows the org to itself ([[chief-designer]])",
+    "Narrative two.",
+    "",
+    "## Disposition",
+    "",
+    "_Pending the Owner_ (accepted / revised / deferred).",
+  ].join("\n");
+
+  it("extracts theme titles and owners", () => {
+    const deck = parseRoadmapDeck(md);
+    expect(deck.themes).toHaveLength(2);
+    expect(deck.themes[0]).toEqual({
+      title: "Finish the trust rails",
+      owners: ["cto", "chief-reality-officer"],
+    });
+    expect(deck.themes[1].title).toBe("A Console that shows the org to itself");
+  });
+
+  it("reads the horizon and normalizes the disposition", () => {
+    const deck = parseRoadmapDeck(md);
+    expect(deck.horizon).toBe("next quarter");
+    expect(deck.disposition).toBe("Pending");
+  });
+
+  it("degrades to empty on a deck with no themes/horizon/disposition", () => {
+    expect(parseRoadmapDeck("# Just a title\n\nsome prose")).toEqual({
+      themes: [],
+      horizon: undefined,
+      disposition: undefined,
+    });
+  });
+});
+
+describe("parseReleaseNow (current milestone + honest gap)", () => {
+  const md = [
+    "# Release 002 — v0.2.0",
+    "",
+    "## Highlights",
+    "The org can now merge its own routine code without the Owner's approval. This release",
+    "built the five mechanical rails [[adr-022]] required.",
+    "",
+    "## Notes",
+    "- **Hand-seeded backfill** assembled from the ledger.",
+    "- **Honest residual:** the `owner-approved` escalation marker is agent-forgeable until",
+    "  [[adr-023]] provisions a restricted identity. Recorded in [[adr-022]].",
+    "- Another note.",
+  ].join("\n");
+
+  it("takes the milestone from the Highlights lead sentence, markdown stripped", () => {
+    const now = parseReleaseNow(md);
+    expect(now.milestone).toBe(
+      "The org can now merge its own routine code without the Owner's approval.",
+    );
+  });
+
+  it("takes the known gap from the Honest residual note, stopping at the next bullet", () => {
+    const now = parseReleaseNow(md);
+    expect(now.residual).toBe(
+      "the owner-approved escalation marker is agent-forgeable until adr-023 provisions a restricted identity.",
+    );
+  });
+
+  it("degrades to empty when the sections are absent", () => {
+    expect(parseReleaseNow("# Release\n\nno structured sections")).toEqual({
+      milestone: undefined,
+      residual: undefined,
+    });
   });
 });
 

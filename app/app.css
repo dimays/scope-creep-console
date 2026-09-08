@@ -1793,33 +1793,73 @@ a.console__item-name:hover {
   flex: 1;
 }
 
+/* Executives are collapsible cards (#2 redesign) so the reporting tree stays a
+   scannable stack of clear entities as headcount grows. The summary always
+   shows counts; reports + summon catalog live in the expandable body. */
 .org__execs {
   list-style: none;
-  margin: 0;
-  padding: 0 0 0 1rem;
-  border-left: 2px solid var(--sc-border);
-  margin-left: 0.8rem;
-}
-.org__exec {
-  margin-top: 1rem;
-  padding-left: 0.6rem;
-}
-.org__exec-head {
+  margin: 0.75rem 0 0;
+  padding: 0;
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.6rem;
 }
-.org__exec-name {
+.org-exec {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+}
+.org-exec__summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0.8rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: var(--sc-radius);
+}
+.org-exec__summary::-webkit-details-marker {
+  display: none;
+}
+.org-exec__summary:focus-visible {
+  outline: 2px solid var(--sc-accent);
+  outline-offset: -2px;
+}
+.org-exec__chevron {
+  color: var(--sc-muted);
+  font-size: 0.7rem;
+  transition: transform var(--sc-motion) var(--sc-ease);
+}
+.org-exec[open] .org-exec__chevron {
+  transform: rotate(90deg);
+}
+.org-exec__name {
   font-weight: 600;
+  font-size: 1rem;
   color: var(--sc-text);
   text-decoration: none;
 }
-.org__exec-name:hover {
+.org-exec__name:hover {
   color: var(--sc-accent);
 }
-.org__counts {
+.org-exec__counts {
+  margin-left: auto;
   font-size: 0.75rem;
+  color: var(--sc-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.org-exec__body {
+  padding: 0.1rem 1.1rem 1rem;
+  border-top: 1px solid var(--sc-border);
+}
+.org-exec__section-label {
+  margin: 0.95rem 0 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--sc-muted);
 }
 .org__empty {
@@ -2341,4 +2381,551 @@ a.org__tpl {
     opacity: 0;
     transform: translateY(6px) scale(0.98);
   }
+}
+
+/* Merged home landing (#1): the Console home now carries both "Your factory"
+   (Threads / Agents / Apps) and "Understand the platform" (the former Explore
+   Overview cards). Each group gets a quiet section label. */
+.home-section {
+  margin-top: 2rem;
+}
+.home-section:first-of-type {
+  margin-top: 0;
+}
+.home-section__title {
+  margin: 0 0 0.85rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--sc-muted);
+}
+
+/* Releases (#7): a segmented toggle switches between "By package" and
+   "Chronological"; version badges carry major/minor/patch emphasis. */
+.seg-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--sc-border);
+  border-radius: 999px;
+  background: var(--sc-bg);
+}
+.seg-toggle__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--sc-muted);
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color var(--sc-motion) var(--sc-ease);
+}
+.seg-toggle__btn:hover {
+  color: var(--sc-text);
+}
+.seg-toggle__btn--active {
+  background: var(--sc-surface);
+  color: var(--sc-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.release-package {
+  margin-top: 1.4rem;
+}
+.release-package:first-of-type {
+  margin-top: 0.6rem;
+}
+.release-package__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.6rem;
+}
+.release-package__name {
+  margin: 0;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.release-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.release-card {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  padding: 0.9rem 1.1rem;
+}
+.release-card__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.release-card__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--sc-text);
+  text-decoration: none;
+}
+.release-card__title:hover {
+  color: var(--sc-accent);
+}
+.release-ver {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  padding: 0.08rem 0.4rem 0.08rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-text);
+}
+.release-ver__tier {
+  font-family: var(--sc-font);
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  background: var(--sc-tag-bg);
+  color: var(--sc-muted);
+}
+.release-ver--major {
+  border-color: color-mix(in srgb, var(--sc-accent) 55%, var(--sc-border));
+  background: color-mix(in srgb, var(--sc-accent) 14%, transparent);
+  color: var(--sc-accent);
+}
+.release-ver--major .release-ver__tier {
+  color: var(--sc-accent);
+  background: color-mix(in srgb, var(--sc-accent) 20%, transparent);
+}
+.release-ver--minor {
+  border-color: color-mix(in srgb, var(--sc-accent) 38%, var(--sc-border));
+}
+.release-ver--patch {
+  color: var(--sc-muted);
+}
+.release-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: var(--sc-muted);
+}
+.release-pkg {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-muted);
+}
+.release-card__desc {
+  margin: 0.55rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--sc-text);
+}
+
+/* Roadmap phase strip (#8): past → now → headed, so where the org has been, is,
+   and is going reads at a glance above the full presentation cards. */
+.roadmap-strip {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: stretch;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1.6rem;
+}
+.roadmap-strip__arrow {
+  align-self: center;
+  color: var(--sc-muted);
+}
+.roadmap-stage {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  padding: 0.85rem 1rem;
+  min-width: 0;
+}
+.roadmap-stage--now {
+  border-color: color-mix(in srgb, var(--sc-accent) 45%, var(--sc-border));
+  background: color-mix(in srgb, var(--sc-accent) 8%, var(--sc-surface));
+}
+.roadmap-stage__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--sc-muted);
+}
+.roadmap-stage__horizon {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.roadmap-stage__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+.roadmap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.roadmap-chip {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-text);
+  text-decoration: none;
+}
+.roadmap-chip:hover {
+  border-color: var(--sc-accent);
+  color: var(--sc-accent);
+}
+.roadmap-chip--major {
+  border-color: color-mix(in srgb, var(--sc-accent) 55%, var(--sc-border));
+  color: var(--sc-accent);
+}
+.roadmap-stage__now-version {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.roadmap-stage__sub {
+  margin: 0.35rem 0 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--sc-muted);
+}
+.roadmap-disp {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.06rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: var(--sc-muted);
+}
+.roadmap-disp--pending {
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 14%, transparent);
+}
+.roadmap-disp--accepted {
+  color: var(--sc-success);
+  background: color-mix(in srgb, var(--sc-success) 14%, transparent);
+}
+.roadmap-disp--revised,
+.roadmap-disp--deferred {
+  color: var(--sc-muted);
+  border-color: var(--sc-border);
+}
+.roadmap-stage__codename {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--sc-accent);
+}
+.roadmap-now-block {
+  margin-top: 0.7rem;
+}
+.roadmap-now-block__label {
+  margin: 0 0 0.15rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sc-success);
+}
+.roadmap-now-block__label--gap {
+  color: var(--sc-warn);
+}
+.roadmap-now-block__text {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--sc-text);
+}
+.roadmap-now-block__link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--sc-accent);
+  text-decoration: none;
+}
+.roadmap-now-block__link:hover {
+  text-decoration: underline;
+}
+.roadmap-themes {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.roadmap-theme {
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.roadmap-theme__title {
+  color: var(--sc-text);
+}
+.roadmap-theme__owner {
+  display: block;
+  font-size: 0.67rem;
+  color: var(--sc-muted);
+}
+@media (max-width: 720px) {
+  .roadmap-strip {
+    grid-template-columns: 1fr;
+  }
+  .roadmap-strip__arrow {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+}
+
+/* Honest empty state (#9): an explanatory card that says why a surface is empty
+   and where the information lives in the meantime, instead of a bare line. */
+.empty-state {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  padding: 1.2rem 1.35rem;
+  max-width: 64ch;
+}
+.empty-state__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+.empty-state__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.empty-state__badge {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--sc-warn) 40%, var(--sc-border));
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 10%, transparent);
+}
+.empty-state__badge--muted {
+  border-color: var(--sc-border);
+  color: var(--sc-muted);
+  background: var(--sc-tag-bg);
+}
+.empty-state__body {
+  margin: 0 0 0.7rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--sc-muted);
+}
+.empty-state__body:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Explore design pass (Chief-Designer feedback) ──────────────────────────
+   Shared vocabulary for the Templates / Docs / Loops / Schedules cleanups. */
+
+/* Skill / capability chips — a wrapping row of quiet, self-contained pills.
+   Replaces the old `.console__tag` reuse inside `.org__skills`, whose
+   `margin-left:auto` made every chip absorb the free space and scatter to the
+   right edge (the ragged, "justified" mess). These sit left-to-right and wrap. */
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  background: var(--sc-tag-bg);
+  color: var(--sc-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+
+/* A generic lifecycle status pill (active | proposed | idle | retired), shared
+   by Loops and Schedules. Mirrors `.org__status` but lives outside the org
+   namespace and adds the `proposed` state the registries use. */
+.status-pill {
+  flex: none;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: var(--sc-muted);
+  background: var(--sc-tag-bg);
+}
+.status-pill--active {
+  color: var(--sc-success);
+  background: color-mix(in srgb, var(--sc-success) 14%, transparent);
+}
+.status-pill--proposed {
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 14%, transparent);
+}
+.status-pill--idle {
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 14%, transparent);
+}
+.status-pill--retired {
+  color: var(--sc-muted);
+  border-color: var(--sc-border);
+  background: transparent;
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+/* Collapsible doc sections (Docs tab). Native <details>/<summary> so it works
+   without JS; collapsed by default to tame the 100+-doc scroll, each header
+   carrying a count badge. */
+.doc-section {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  margin-bottom: 0.6rem;
+}
+.doc-section__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: var(--sc-radius);
+}
+.doc-section__summary::-webkit-details-marker {
+  display: none;
+}
+.doc-section__summary:hover {
+  color: var(--sc-accent);
+}
+.doc-section__summary:focus-visible {
+  outline: 2px solid var(--sc-accent);
+  outline-offset: -2px;
+}
+.doc-section__chevron {
+  color: var(--sc-muted);
+  font-size: 0.7rem;
+  transition: transform var(--sc-motion) var(--sc-ease);
+}
+.doc-section[open] .doc-section__chevron {
+  transform: rotate(90deg);
+}
+.doc-section__name {
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.doc-section__summary .console__count {
+  margin-left: auto;
+}
+.doc-section__body {
+  padding: 0.35rem 1.1rem 0.85rem;
+  border-top: 1px solid var(--sc-border);
+}
+
+/* Loop cards (Loops tab) — a card per governed procedure, surfacing the
+   one-line description the registry already carries, plus owner + status. */
+.loop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.loop-card__desc {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--sc-text);
+  flex: 1;
+}
+.loop-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+.loop-card__owner {
+  color: var(--sc-muted);
+  text-decoration: none;
+}
+.loop-card__owner:hover {
+  color: var(--sc-accent);
+}
+
+/* Schedule cards (Schedules tab) — one card per cloud routine, with a labeled
+   field grid so cadence / self-tune bounds / model line up and breathe. */
+.schedule-card {
+  display: flex;
+  flex-direction: column;
+}
+.schedule-card__meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0 1rem;
+}
+.schedule-card__meta dt {
+  margin: 0;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sc-muted);
+  align-self: center;
+}
+.schedule-card__meta dd {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--sc-text);
+}
+.schedule-card__model {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+}
+.schedule-card__manage {
+  margin-top: auto;
+  font-size: 0.8rem;
+  color: var(--sc-accent);
+  text-decoration: none;
+}
+.schedule-card__manage:hover {
+  text-decoration: underline;
 }
