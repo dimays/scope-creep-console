@@ -295,6 +295,67 @@ export async function addGeneratedRequest(
   });
 }
 
+type OrgUpdateOpts = {
+  /** The card headline (e.g. "Triaged — ticket created", "Need your call on scope"). */
+  label: string;
+  /** Optional body prose under the headline. */
+  body?: string;
+  /** Optional deep link to the artifact this update is about (PR, ticket, PRD, …). */
+  refUrl?: string;
+  /** Short label for the deep link (e.g. the ticket id `work-064`). */
+  refLabel?: string;
+  /** The posting author (default `chief-of-staff`). */
+  author?: string;
+  /** Override the resulting turn/status (defaults per write-back type). */
+  status?: ThreadStatus;
+};
+
+/**
+ * The org's **async write-back** (work-064): a server-side process with **no launched Claude
+ * session** (the [[request-triage]] routine, an agent running a script) posts a message into a
+ * thread and moves its turn — the capability ADR-016 left as a read-only projection until now.
+ * This is the internal entry point Pillars I–II of [[prd-request-loop]] depend on; the
+ * scheduled routine that calls it is work-066.
+ *
+ * `postCriticalUpdate` records a **FYI** — a triage decision or progress note. The thread
+ * **stays the org's** (`working` by default): it's information, not a question. Rendered as a
+ * typed `critical-update` card and counted as notable org activity by the unread signal
+ * (work-063). Authored by the org (`agent` role), so it never enters the Human-Input Log.
+ */
+export async function postCriticalUpdate(threadId: number, opts: OrgUpdateOpts): Promise<void> {
+  await addMessage(threadId, "agent", opts.body ?? "", {
+    type: "critical-update",
+    status: opts.status ?? "working",
+    meta: orgUpdateMeta(opts),
+  });
+}
+
+/**
+ * The org's **async write-back** for a question (work-064): a server-side process posts a
+ * message that **parks the thread on the Owner** (`needs-you` by default) — the org needs the
+ * Owner's input to proceed. Rendered as a visually-distinct typed `needs-input` card and the
+ * strongest driver of the unread badge / notification center (work-063). Authored by the org
+ * (`agent` role), so it never enters the Human-Input Log. The counterpart to
+ * {@link postCriticalUpdate}, which stays the org's turn.
+ */
+export async function postNeedsInput(threadId: number, opts: OrgUpdateOpts): Promise<void> {
+  await addMessage(threadId, "agent", opts.body ?? "", {
+    type: "needs-input",
+    status: opts.status ?? "needs-you",
+    meta: orgUpdateMeta(opts),
+  });
+}
+
+/** Shared meta shape for the two write-back cards — author label + optional deep link. */
+function orgUpdateMeta(opts: OrgUpdateOpts): MessageMeta {
+  return {
+    author: opts.author ?? "chief-of-staff",
+    label: opts.label,
+    ...(opts.refUrl ? { refUrl: opts.refUrl } : {}),
+    ...(opts.refLabel ? { refLabel: opts.refLabel } : {}),
+  };
+}
+
 type AddOpts = {
   type?: string;
   status?: ThreadStatus;

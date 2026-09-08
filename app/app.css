@@ -943,6 +943,30 @@ a.console__item-name:hover {
   color: var(--sc-attention);
 }
 
+/* Org async write-back (work-064). A critical-update is an FYI — muted, informational; the
+   thread stays the org's. A needs-input parks the thread on the Owner, so it's deliberately
+   the loudest card: an attention-tinted fill + a filled badge, standing out from chatter. */
+.outcome-card--update {
+  border-left-color: var(--sc-muted);
+}
+
+.outcome-card--update .outcome-card__badge {
+  color: var(--sc-muted);
+}
+
+.outcome-card--needs-input {
+  border-left-color: var(--sc-attention);
+  background: color-mix(in srgb, var(--sc-attention) 8%, var(--sc-surface));
+}
+
+.outcome-card--needs-input .outcome-card__badge {
+  background: var(--sc-attention);
+  color: var(--sc-bg);
+  border-radius: 5px;
+  padding: 0.1rem 0.4rem;
+  font-weight: 700;
+}
+
 /* Branch backlink under a child thread's title. */
 .thread-branchline {
   margin: 0.2rem 0 0;
