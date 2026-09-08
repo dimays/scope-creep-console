@@ -12,12 +12,15 @@ import {
   launchThread,
   linkThreadSession,
   listArchivedThreads,
+  listNotifications,
   listThreads,
+  markThreadRead,
   orgFollowup,
   postCriticalUpdate,
   postNeedsInput,
   restoreThread,
   setStatus,
+  unreadThreadCount,
 } from "./threads.server";
 
 describe("Owner-initiated threads", () => {
@@ -334,6 +337,64 @@ describe("org async write-back (work-064)", () => {
     const t = await createThread("Override", "…");
     await postCriticalUpdate(t.id, { label: "Done — nothing more needed", status: "closed" });
     expect((await getThread(t.id))?.thread.status).toBe("closed");
+  });
+});
+
+describe("read-state, unread badge & notifications (work-063)", () => {
+  it("org write-back raises unread; opening the thread (markThreadRead) clears it", async () => {
+    const before = await unreadThreadCount();
+    const t = await createThread("Read me", "Owner opens this.");
+    // Owner-only activity so far → never unread; the count is unchanged.
+    expect(await unreadThreadCount()).toBe(before);
+
+    await postNeedsInput(t.id, { label: "A question" }); // org activity → unread
+    expect(await unreadThreadCount()).toBe(before + 1);
+
+    await markThreadRead(t.id); // opening the thread clears its unread
+    expect(await unreadThreadCount()).toBe(before);
+  });
+
+  it("a later org write-back after reading re-raises the thread's unread", async () => {
+    const t = await createThread("Re-raise", "…");
+    await markThreadRead(t.id);
+    const base = await unreadThreadCount();
+    await new Promise((r) => setTimeout(r, 2)); // ensure the message postdates the read stamp
+    await postCriticalUpdate(t.id, { label: "New update" });
+    expect(await unreadThreadCount()).toBe(base + 1);
+  });
+
+  it("listNotifications surfaces needs-you + notable updates newest-first, linking to threads", async () => {
+    const a = await createThread("Notif A", "…");
+    await postNeedsInput(a.id, { label: "Decide A" }); // parks the Owner + notable
+    const b = await createThread("Notif B", "…");
+    await postCriticalUpdate(b.id, { label: "FYI B" }); // stays the org's + notable
+
+    const notifs = await listNotifications();
+    const forA = notifs.find((n) => n.threadId === a.id);
+    const forB = notifs.find((n) => n.threadId === b.id);
+    expect(forA?.kind).toBe("needs-input");
+    expect(forA?.href).toBe(`/threads/${a.id}`);
+    expect(forB?.kind).toBe("critical-update");
+    // The whole feed is newest-first.
+    const ts = notifs.map((n) => n.ts);
+    expect([...ts].sort((x, y) => y - x)).toEqual(ts);
+  });
+
+  it("opening a thread clears its unread flag in the notification feed", async () => {
+    const t = await createThread("Clear flag", "…");
+    await postNeedsInput(t.id, { label: "Q" });
+    expect((await listNotifications()).find((n) => n.threadId === t.id)?.unread).toBe(true);
+    await markThreadRead(t.id);
+    expect((await listNotifications()).find((n) => n.threadId === t.id)?.unread).toBe(false);
+  });
+
+  it("archived threads never appear in the feed or the unread count", async () => {
+    const t = await createThread("Archive from notif", "…");
+    await postNeedsInput(t.id, { label: "Q" });
+    const before = await unreadThreadCount();
+    await archiveThread(t.id);
+    expect((await listNotifications()).some((n) => n.threadId === t.id)).toBe(false);
+    expect(await unreadThreadCount()).toBe(before - 1);
   });
 });
 

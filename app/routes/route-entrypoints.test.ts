@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loader as healthzLoader } from "./healthz";
+import { loader as notificationsLoader } from "./notifications";
 import { action as employeePreviewAction } from "./org-employee-preview";
 import { action as templatePreviewAction } from "./org-template-preview";
 import { loader as settingsRedirect } from "./settings";
@@ -193,6 +194,16 @@ describe("route: archive / restore threads (work-049)", () => {
     const main = await threadsLoader({} as never);
     expect(typeof main.archivedCount).toBe("number");
     expect(main.archivedCount).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("route: /notifications (work-063)", () => {
+  it("loader returns a notifications array and an unread count", async () => {
+    const data = await notificationsLoader({} as never);
+    expect(Array.isArray(data.notifications)).toBe(true);
+    expect(typeof data.unread).toBe("number");
+    // Every row links back to its thread.
+    expect(data.notifications.every((n) => n.href === `/threads/${n.threadId}`)).toBe(true);
   });
 });
 

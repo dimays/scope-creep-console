@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Thread } from "./threads";
+import type { NotifiableMessage, NotifiableThread, Thread } from "./threads";
 import {
+  buildNotifications,
+  countUnread,
   groupThreads,
   isArchived,
   isNotableUpdate,
+  isUnread,
   NOTABLE_MESSAGE_TYPES,
   needsYouThreads,
   parseMeta,
@@ -124,6 +127,107 @@ describe("notable org write-back types (work-064)", () => {
     for (const type of NOTABLE_MESSAGE_TYPES) {
       expect(isNotableUpdate(type)).toBe(true);
     }
+  });
+});
+
+describe("unread derivation (work-063)", () => {
+  it("isUnread is true when the newest org message postdates the last open", () => {
+    expect(isUnread({ lastOrgAt: 200, lastReadAt: 100 })).toBe(true);
+  });
+
+  it("isUnread is false once the thread has been opened at/after its latest org activity", () => {
+    expect(isUnread({ lastOrgAt: 100, lastReadAt: 100 })).toBe(false); // opened at the same tick
+    expect(isUnread({ lastOrgAt: 100, lastReadAt: 200 })).toBe(false); // opened after
+  });
+
+  it("a never-opened thread with org activity is unread; owner-only activity never is", () => {
+    expect(isUnread({ lastOrgAt: 100, lastReadAt: null })).toBe(true);
+    expect(isUnread({ lastOrgAt: null, lastReadAt: null })).toBe(false); // no org message
+    expect(isUnread({ lastOrgAt: null, lastReadAt: 100 })).toBe(false);
+  });
+
+  it("countUnread counts only the threads that are unread", () => {
+    const count = countUnread([
+      { lastOrgAt: 200, lastReadAt: 100 }, // unread
+      { lastOrgAt: 100, lastReadAt: 100 }, // read
+      { lastOrgAt: 300, lastReadAt: null }, // unread
+      { lastOrgAt: null, lastReadAt: null }, // no org activity
+    ]);
+    expect(count).toBe(2);
+  });
+});
+
+describe("notification feed (work-063)", () => {
+  const thread = (
+    over: Partial<NotifiableThread> & Pick<NotifiableThread, "id">,
+  ): NotifiableThread => ({
+    title: `Thread ${over.id}`,
+    status: "working",
+    updatedAt: over.id,
+    archivedAt: null,
+    lastOrgAt: null,
+    lastReadAt: null,
+    ...over,
+  });
+  const msg = (
+    over: Partial<NotifiableMessage> & Pick<NotifiableMessage, "conversationId" | "type" | "at">,
+  ): NotifiableMessage => ({ body: "", meta: null, ...over });
+
+  it("lists notable org updates + needs-you threads, newest-first, each linking to its thread", () => {
+    const threads = [
+      thread({ id: 1, status: "needs-you", updatedAt: 50, lastOrgAt: 50 }),
+      thread({ id: 2, status: "working", updatedAt: 40, lastOrgAt: 40 }),
+    ];
+    const messages = [
+      msg({ conversationId: 2, type: "critical-update", at: 40, meta: '{"label":"Triaged"}' }),
+    ];
+    const items = buildNotifications(threads, messages);
+    // Newest-first by ts: thread 1's needs-you (ts 50) before thread 2's update (ts 40).
+    expect(items.map((i) => i.threadId)).toEqual([1, 2]);
+    expect(items[0].kind).toBe("needs-you");
+    expect(items[1].kind).toBe("critical-update");
+    expect(items[1].label).toBe("Triaged");
+    expect(items.every((i) => i.href === `/threads/${i.threadId}`)).toBe(true);
+  });
+
+  it("dedups: a needs-you thread already shown via its notable message is not repeated", () => {
+    const threads = [thread({ id: 7, status: "needs-you", updatedAt: 100, lastOrgAt: 100 })];
+    const messages = [
+      msg({ conversationId: 7, type: "needs-input", at: 100, meta: '{"label":"Your call?"}' }),
+    ];
+    const items = buildNotifications(threads, messages);
+    expect(items).toHaveLength(1); // the message, not a duplicate bare needs-you row
+    expect(items[0].kind).toBe("needs-input");
+    expect(items[0].label).toBe("Your call?");
+  });
+
+  it("a needs-you thread parked without a typed card still surfaces (via orgFollowup)", () => {
+    const threads = [thread({ id: 3, status: "needs-you", updatedAt: 70, lastOrgAt: 70 })];
+    const items = buildNotifications(threads, []); // no notable message rows
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe("needs-you");
+  });
+
+  it("excludes archived threads and their messages", () => {
+    const threads = [thread({ id: 4, status: "needs-you", updatedAt: 80, archivedAt: 999 })];
+    const messages = [msg({ conversationId: 4, type: "needs-input", at: 80 })];
+    expect(buildNotifications(threads, messages)).toEqual([]);
+  });
+
+  it("carries the unread flag from the thread's read-state", () => {
+    const threads = [
+      thread({ id: 5, status: "needs-you", updatedAt: 60, lastOrgAt: 60, lastReadAt: null }),
+      thread({ id: 6, status: "needs-you", updatedAt: 55, lastOrgAt: 55, lastReadAt: 55 }),
+    ];
+    const items = buildNotifications(threads, []);
+    expect(items.find((i) => i.threadId === 5)?.unread).toBe(true);
+    expect(items.find((i) => i.threadId === 6)?.unread).toBe(false);
+  });
+
+  it("ignores non-notable message types", () => {
+    const threads = [thread({ id: 8, status: "working", updatedAt: 90 })];
+    const messages = [msg({ conversationId: 8, type: "message", at: 90 })];
+    expect(buildNotifications(threads, messages)).toEqual([]);
   });
 });
 

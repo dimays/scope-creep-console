@@ -9,6 +9,8 @@ export default [
   // The Archive view (work-049) — static segment before `:id` so it isn't shadowed.
   route("threads/archive", "routes/threads-archive.tsx"),
   route("threads/:id", "routes/thread.tsx"),
+  // Notification center (work-063): needs-you threads + notable org updates, newest-first.
+  route("notifications", "routes/notifications.tsx"),
   // Legacy redirect → Threads (old top-level Chat tab). The in-app agent-chat runtime and
   // the Propose surface it backed were retired per ADR-019; this bare redirect stays so old
   // /chat links don't 404.
