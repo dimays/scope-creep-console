@@ -47,19 +47,25 @@ export default function ExploreActivity({ loaderData }: Route.ComponentProps) {
         {events.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state__head">
-              <p className="empty-state__title">No activity captured yet</p>
-              <span className="empty-state__badge">Awaiting core · work-036</span>
+              <p className="empty-state__title">No activity to show here</p>
+              <span className="empty-state__badge empty-state__badge--muted">
+                Local log · work-036
+              </span>
             </div>
             <p className="empty-state__body">
-              This surface projects a structured activity log (<code>activity/*.ndjson</code> in the
-              control plane). Nothing writes that log yet: the capture hook that emits delegations,
-              spin-ups, and confers is an <strong>unbuilt feature in core scope-creep</strong> (
-              <code>work-036</code>, delegation-event-capture) — not a console bug. Once it lands
-              and the org runs, entries appear here automatically.
+              The capture hook <em>is</em> built and shipping (<code>work-036</code>, done): a{" "}
+              <code>PreToolUse: Task</code> hook appends each spawn/delegation to{" "}
+              <code>activity/YYYY-MM.ndjson</code>. But that log is intentionally{" "}
+              <strong>local and gitignored</strong> — it mirrors <code>human-input/</code> and is
+              never pushed — so it only has entries where the org has actually delegated. A fresh
+              clone, a different machine, or a deployed console reading a clone all show nothing
+              here.
             </p>
             <p className="empty-state__body">
-              In the meantime, the org's recorded decisions and events live on the{" "}
-              <Link to="/explore/timeline">Timeline</Link> (the ledger).
+              So this is expected on a quiet workspace — but it also means the surface can never
+              populate for a console that isn't the one where delegations ran. That transport gap is
+              being triaged separately. In the meantime, the org's recorded decisions and events
+              live on the <Link to="/explore/timeline">Timeline</Link> (the ledger).
             </p>
           </div>
         ) : (
