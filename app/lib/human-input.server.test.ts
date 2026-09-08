@@ -16,13 +16,34 @@ beforeAll(async () => {
   await mkdir(join(home, "human-input"), { recursive: true });
   await writeFile(
     join(home, "human-input", "2026-09.ndjson"),
-    `${JSON.stringify({
-      source: "operator-session",
-      ts: 1_700_000_000_000,
-      session: "s",
-      cwd: "/x",
-      text: "kick off work-026 runtime tests",
-    })}\n`,
+    `${[
+      // A genuine Owner prompt.
+      JSON.stringify({
+        source: "operator-session",
+        ts: 1_700_000_000_000,
+        session: "s",
+        cwd: "/x",
+        text: "kick off work-026 runtime tests",
+      }),
+      // A purely harness-injected line (background-task notification) — NOT human input,
+      // so it must be excluded from the log entirely.
+      JSON.stringify({
+        source: "operator-session",
+        ts: 1_700_000_050_000,
+        session: "s",
+        cwd: "/x",
+        text: "<task-notification>\n<status>done</status>\n</task-notification>",
+      }),
+      // A system-reminder prepended to a real message — the reminder is stripped and only
+      // the Owner's text survives.
+      JSON.stringify({
+        source: "operator-session",
+        ts: 1_700_000_060_000,
+        session: "s",
+        cwd: "/x",
+        text: "<system-reminder>\nUsage limit reached.\n</system-reminder>\n\nresume the deploy",
+      }),
+    ].join("\n")}\n`,
   );
   process.env.SCOPE_CREEP_HOME = home; // not a git repo → commitsBetween returns []
 
@@ -87,8 +108,21 @@ describe("listHumanInput", () => {
       expect(events[i - 1].ts >= events[i].ts).toBe(true); // newest-first
     }
 
-    const op = events.find((e) => e.source === "operator-session");
-    expect(op?.summary).toContain("work-026");
+    const ops = events.filter((e) => e.source === "operator-session");
+    expect(ops.some((e) => e.summary.includes("work-026"))).toBe(true);
+  });
+
+  it("excludes harness-injected operator-session lines and strips reminder prefixes", async () => {
+    const events = await listHumanInput();
+    const opTexts = events
+      .filter((e) => e.source === "operator-session")
+      .map((e) => e.excerpt ?? e.summary);
+
+    // The bare task-notification line is not human input → never appears.
+    expect(opTexts.some((t) => t.includes("task-notification"))).toBe(false);
+    // The system-reminder was stripped, leaving only the Owner's own text.
+    expect(opTexts).toContain("resume the deploy");
+    expect(opTexts.some((t) => t.includes("system-reminder"))).toBe(false);
   });
 
   it("buildSpine returns the inputs (no git interludes in a fixture home)", async () => {
