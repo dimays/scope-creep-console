@@ -108,3 +108,18 @@ export const settings = sqliteTable("settings", {
 });
 
 export type Setting = typeof settings.$inferSelect;
+
+/**
+ * Per-thread read-state (work-063): when the Owner last opened a thread. "Unread" is real —
+ * a thread has unread org activity when its latest `role = agent` message is newer than
+ * `lastReadAt` — instead of being derived from `status` alone. Single-user by invariant
+ * (INVARIANTS §II), so it's keyed by thread with **no per-user scoping**; opening a thread
+ * upserts `lastReadAt = now`, which clears its unread. A thread the Owner has never opened has
+ * no row — treated as never-read, so first org activity counts as unread.
+ */
+export const threadReads = sqliteTable("thread_reads", {
+  conversationId: integer("conversation_id").primaryKey(),
+  lastReadAt: integer("last_read_at").notNull(),
+});
+
+export type ThreadRead = typeof threadReads.$inferSelect;

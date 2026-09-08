@@ -29,6 +29,7 @@ import {
   getThread,
   launchThread,
   linkThreadSession,
+  markThreadRead,
 } from "~/lib/threads.server";
 import type { Route } from "./+types/thread";
 
@@ -47,6 +48,11 @@ export async function loader({ params }: Route.LoaderArgs) {
   const id = Number(params.id);
   const thread = await getThread(id);
   if (!thread) throw new Response("Not found", { status: 404 });
+
+  // Opening a thread clears its unread (work-063): stamp the read marker so the nav badge and
+  // the notification center stop flagging it. Runs on the short-poll revalidation too, so a
+  // thread the Owner is actively watching stays read as new org turns arrive.
+  await markThreadRead(id);
 
   // The launcher + projected transcript (work-046/047, ADR-016) — reads local Claude Code
   // session data only, never calls Claude. The seed is the thread's first Owner message.

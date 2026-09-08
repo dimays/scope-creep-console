@@ -1,7 +1,17 @@
-import { desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { desc, eq, inArray, isNotNull, isNull, max } from "drizzle-orm";
 import { db, ensureSchema } from "~/db";
-import { conversationMessages, conversations } from "~/db/schema";
-import type { BranchLink, MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
+import { conversationMessages, conversations, threadReads } from "~/db/schema";
+import {
+  type BranchLink,
+  buildNotifications,
+  countUnread,
+  type MessageMeta,
+  NOTABLE_MESSAGE_TYPES,
+  type NotificationItem,
+  type Thread,
+  type ThreadMessage,
+  type ThreadStatus,
+} from "./threads";
 
 /**
  * CoS-Threads data layer (work-029, ADR-012). A **thread** is a `conversation`; its
@@ -450,4 +460,99 @@ export async function setStatus(threadId: number, status: ThreadStatus): Promise
     .update(conversations)
     .set({ status, updatedAt: Date.now() })
     .where(eq(conversations.id, threadId));
+}
+
+// --- Read-state, unread badge & notification center (work-063) -----------
+
+/**
+ * Mark a thread read (work-063): stamp `lastReadAt = now`, which clears its unread. Called when
+ * the Owner opens a thread. Single-user by invariant (INVARIANTS §II), so it's keyed by thread
+ * with no per-user scoping. Upsert — the first open inserts the row, later opens update it.
+ */
+export async function markThreadRead(threadId: number): Promise<void> {
+  await ensureSchema();
+  const now = Date.now();
+  await db
+    .insert(threadReads)
+    .values({ conversationId: threadId, lastReadAt: now })
+    .onConflictDoUpdate({ target: threadReads.conversationId, set: { lastReadAt: now } });
+}
+
+/** Map of thread id → the `at` of its newest org (`role = agent`) message. */
+async function lastOrgAtByThread(): Promise<Map<number, number>> {
+  const rows = await db
+    .select({ cid: conversationMessages.conversationId, lastAt: max(conversationMessages.at) })
+    .from(conversationMessages)
+    .where(eq(conversationMessages.role, "agent"))
+    .groupBy(conversationMessages.conversationId);
+  const map = new Map<number, number>();
+  for (const r of rows) if (r.lastAt != null) map.set(r.cid, r.lastAt);
+  return map;
+}
+
+/** Map of thread id → when the Owner last opened it. */
+async function lastReadByThread(): Promise<Map<number, number>> {
+  const rows = await db.select().from(threadReads);
+  return new Map(rows.map((r) => [r.conversationId, r.lastReadAt]));
+}
+
+/**
+ * The persistent unread badge count (work-063): how many **non-archived** threads have unread
+ * org activity — a `role = agent` message newer than the Owner's last open. Read by the root
+ * loader so the badge is present and accurate on every page. Owner-only threads never count;
+ * opening a thread clears it.
+ */
+export async function unreadThreadCount(): Promise<number> {
+  await ensureSchema();
+  const [threads, lastOrg, lastRead] = await Promise.all([
+    listThreads(), // non-archived only
+    lastOrgAtByThread(),
+    lastReadByThread(),
+  ]);
+  return countUnread(
+    threads.map((t) => ({
+      lastOrgAt: lastOrg.get(t.id) ?? null,
+      lastReadAt: lastRead.get(t.id) ?? null,
+    })),
+  );
+}
+
+/**
+ * The notification center feed (work-063): the Owner's `needs-you` threads plus recent notable
+ * org updates (`critical-update` / `needs-input` — work-064), newest-first, each linking to its
+ * thread. Fetches the raw rows and delegates ordering/dedup/unread flags to the pure
+ * {@link buildNotifications}. Archived threads never appear.
+ */
+export async function listNotifications(limit = 100): Promise<NotificationItem[]> {
+  await ensureSchema();
+  const [threads, lastOrg, lastRead, notable] = await Promise.all([
+    listThreads(), // non-archived only
+    lastOrgAtByThread(),
+    lastReadByThread(),
+    db
+      .select()
+      .from(conversationMessages)
+      .where(inArray(conversationMessages.type, [...NOTABLE_MESSAGE_TYPES]))
+      .orderBy(desc(conversationMessages.at))
+      .limit(limit),
+  ]);
+  const notifiable = threads.map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    updatedAt: t.updatedAt,
+    archivedAt: t.archivedAt,
+    lastOrgAt: lastOrg.get(t.id) ?? null,
+    lastReadAt: lastRead.get(t.id) ?? null,
+  }));
+  return buildNotifications(
+    notifiable,
+    notable.map((m) => ({
+      conversationId: m.conversationId,
+      type: m.type,
+      body: m.body,
+      meta: m.meta,
+      at: m.at,
+    })),
+  );
 }
