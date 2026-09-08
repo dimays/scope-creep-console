@@ -2288,6 +2288,145 @@ a.org__tpl {
   color: var(--sc-muted);
 }
 
+/* Releases (#7): a segmented toggle switches between "By package" and
+   "Chronological"; version badges carry major/minor/patch emphasis. */
+.seg-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--sc-border);
+  border-radius: 999px;
+  background: var(--sc-bg);
+}
+.seg-toggle__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--sc-muted);
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color var(--sc-motion) var(--sc-ease);
+}
+.seg-toggle__btn:hover {
+  color: var(--sc-text);
+}
+.seg-toggle__btn--active {
+  background: var(--sc-surface);
+  color: var(--sc-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.release-package {
+  margin-top: 1.4rem;
+}
+.release-package:first-of-type {
+  margin-top: 0.6rem;
+}
+.release-package__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.6rem;
+}
+.release-package__name {
+  margin: 0;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.release-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.release-card {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  padding: 0.9rem 1.1rem;
+}
+.release-card__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.release-card__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--sc-text);
+  text-decoration: none;
+}
+.release-card__title:hover {
+  color: var(--sc-accent);
+}
+.release-ver {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  padding: 0.08rem 0.4rem 0.08rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-text);
+}
+.release-ver__tier {
+  font-family: var(--sc-font);
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  background: var(--sc-tag-bg);
+  color: var(--sc-muted);
+}
+.release-ver--major {
+  border-color: color-mix(in srgb, var(--sc-accent) 55%, var(--sc-border));
+  background: color-mix(in srgb, var(--sc-accent) 14%, transparent);
+  color: var(--sc-accent);
+}
+.release-ver--major .release-ver__tier {
+  color: var(--sc-accent);
+  background: color-mix(in srgb, var(--sc-accent) 20%, transparent);
+}
+.release-ver--minor {
+  border-color: color-mix(in srgb, var(--sc-accent) 38%, var(--sc-border));
+}
+.release-ver--patch {
+  color: var(--sc-muted);
+}
+.release-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: var(--sc-muted);
+}
+.release-pkg {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-muted);
+}
+.release-card__desc {
+  margin: 0.55rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--sc-text);
+}
+
 /* ── Explore design pass (Chief-Designer feedback) ──────────────────────────
    Shared vocabulary for the Templates / Docs / Loops / Schedules cleanups. */
 

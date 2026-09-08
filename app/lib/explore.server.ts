@@ -423,6 +423,10 @@ export type ArtifactEntry = {
   order: number;
   /** The `**Date:**` / `**Date range:**` line from the body, if present. */
   date?: string;
+  /** Releases only: the `**Scope:**` line — which package/area the release covers. */
+  scope?: string;
+  /** Releases only: the semver (e.g. `v0.2.0`) read from the H1 or `**Version:**` line. */
+  version?: string;
   file: string;
 };
 
@@ -446,16 +450,56 @@ async function listArtifacts(dir: string): Promise<ArtifactEntry[]> {
     const src = await readMd(join(dir, file));
     if (src === null) continue;
     const { fm, body } = parseFrontmatter(src);
+    const title = firstHeading(body, fm.name ?? file.replace(/\.md$/, ""));
+    const scope = /\*\*Scope:\*\*\s*(.+)/.exec(body)?.[1]?.trim();
+    // Prefer the version in the H1 (e.g. "… — v0.2.0 (…)"); fall back to the body's
+    // `**Version:**` line. Stored bare (no leading "v") so callers can render it freely.
+    const version =
+      /\bv(\d+\.\d+\.\d+)/.exec(title)?.[1] ??
+      /\*\*Version:\*\*\s*v?(\d+\.\d+\.\d+)/.exec(body)?.[1];
     out.push({
       slug: fm.name ?? join(dir, file).replace(/[/.]/g, "-"),
-      title: firstHeading(body, fm.name ?? file.replace(/\.md$/, "")),
+      title,
       description: fm.description ?? "",
       order: Number.parseInt(file, 10) || 0,
       date: /\*\*Date(?:\s+range)?:\*\*\s*(.+)/.exec(body)?.[1]?.trim(),
+      scope,
+      version,
       file,
     });
   }
   return out.sort((a, b) => b.order - a.order);
+}
+
+/** How significant a release is, from its semver: X.0.0 = major, X.Y.0 = minor,
+ *  else patch. Drives the version badge's emphasis on the Releases surface (#7). */
+export type ReleaseTier = "major" | "minor" | "patch";
+export function releaseTier(version?: string): ReleaseTier | undefined {
+  const m = /(\d+)\.(\d+)\.(\d+)/.exec(version ?? "");
+  if (!m) return undefined;
+  const [, , minor, patch] = m;
+  if (patch !== "0") return "patch";
+  if (minor !== "0") return "minor";
+  return "major";
+}
+
+/** The package/area a release covers, derived from its free-text `**Scope:**` line,
+ *  so the Releases surface can group by package (#7). Recognizes the known repos and
+ *  falls back to the leading clause of the scope text. */
+export type ReleasePackage = { key: string; label: string };
+export function releasePackage(scope?: string): ReleasePackage {
+  const s = (scope ?? "").toLowerCase();
+  // An explicit package slug in parentheses wins, e.g. "(scope-creep-console)".
+  const slug = /\((scope-creep[a-z0-9-]*)\)/.exec(s)?.[1] ?? "";
+  const hit = slug || s;
+  if (/ext-|extension/.test(hit)) return { key: "extensions", label: "Extensions" };
+  if (/console/.test(hit)) return { key: "console", label: "Console" };
+  if (/design/.test(hit)) return { key: "design", label: "Design system" };
+  if (/control-plane|core|scope-creep/.test(hit)) {
+    return { key: "scope-creep", label: "Scope Creep core" };
+  }
+  const fallback = (scope ?? "").split(/[—,(]/)[0]?.trim();
+  return { key: fallback ? fallback.toLowerCase() : "other", label: fallback || "Other" };
 }
 
 /** Control-plane release-notes entries, newest first (work-054). */

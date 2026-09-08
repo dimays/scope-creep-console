@@ -29,6 +29,8 @@ import {
   readAgent,
   readLoop,
   readRoutines,
+  releasePackage,
+  releaseTier,
   versionSkew,
 } from "./explore.server";
 
@@ -96,6 +98,47 @@ describe("versionSkew", () => {
 
   it("ignores a source that couldn't be read (null)", () => {
     expect(versionSkew({ app: "0.15.0", pkg: null, changelog: "0.15.0" })).toEqual([]);
+  });
+});
+
+describe("releaseTier (semver → major/minor/patch)", () => {
+  it("classifies X.0.0 as major", () => {
+    expect(releaseTier("v1.0.0")).toBe("major");
+    expect(releaseTier("2.0.0")).toBe("major");
+  });
+  it("classifies X.Y.0 as minor", () => {
+    expect(releaseTier("v0.1.0")).toBe("minor");
+    expect(releaseTier("v0.2.0")).toBe("minor");
+  });
+  it("classifies X.Y.Z (Z>0) as patch", () => {
+    expect(releaseTier("v0.2.1")).toBe("patch");
+  });
+  it("returns undefined for a missing/unparseable version", () => {
+    expect(releaseTier(undefined)).toBeUndefined();
+    expect(releaseTier("dev")).toBeUndefined();
+  });
+});
+
+describe("releasePackage (scope → package group)", () => {
+  it("maps the control-plane / core scope to Scope Creep core", () => {
+    expect(releasePackage("control-plane (scope-creep)")).toEqual({
+      key: "scope-creep",
+      label: "Scope Creep core",
+    });
+  });
+  it("prefers an explicit package slug in parentheses", () => {
+    expect(releasePackage("companion polish in (scope-creep-console)").key).toBe("console");
+  });
+  it("recognizes console, design, and extensions", () => {
+    expect(releasePackage("the Console app").label).toBe("Console");
+    expect(releasePackage("the design system").label).toBe("Design system");
+    expect(releasePackage("scope-creep-ext-feedback").label).toBe("Extensions");
+  });
+  it("falls back to the leading clause of unknown scope text", () => {
+    expect(releasePackage("Widgets — some area").label).toBe("Widgets");
+  });
+  it("returns an Other bucket for empty scope", () => {
+    expect(releasePackage(undefined).key).toBe("other");
   });
 });
 
