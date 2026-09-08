@@ -29,6 +29,7 @@ import {
   getThread,
   launchThread,
   linkThreadSession,
+  markThreadRead,
 } from "~/lib/threads.server";
 import type { Route } from "./+types/thread";
 
@@ -47,6 +48,11 @@ export async function loader({ params }: Route.LoaderArgs) {
   const id = Number(params.id);
   const thread = await getThread(id);
   if (!thread) throw new Response("Not found", { status: 404 });
+
+  // Opening a thread clears its unread (work-063): stamp the read marker so the nav badge and
+  // the notification center stop flagging it. Runs on the short-poll revalidation too, so a
+  // thread the Owner is actively watching stays read as new org turns arrive.
+  await markThreadRead(id);
 
   // The launcher + projected transcript (work-046/047, ADR-016) — reads local Claude Code
   // session data only, never calls Claude. The seed is the thread's first Owner message.
@@ -213,6 +219,8 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           if (msg.type === "generated-request")
             return <GeneratedRequestCard key={msg.id} msg={msg} />;
           if (msg.type === "branch") return <BranchCard key={msg.id} msg={msg} />;
+          if (msg.type === "critical-update") return <CriticalUpdateCard key={msg.id} msg={msg} />;
+          if (msg.type === "needs-input") return <NeedsInputCard key={msg.id} msg={msg} />;
           // Once launched, plain messages are shown by the projected transcript below —
           // render only the typed cards here so the opener isn't duplicated.
           if (launched) return null;
@@ -517,6 +525,53 @@ function GeneratedRequestCard({ msg }: { msg: ThreadMessage }) {
         {meta.refUrl ? (
           <Link to={meta.refUrl} className="outcome-card__link">
             {meta.refLabel ? `${meta.refLabel} →` : "View the created ticket →"}
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A critical-update card (work-064): the org's async write-back FYI — a triage decision or a
+ * progress note posted by a server-side process with no launched session. The thread stays the
+ * org's; this is information, not a question. Neutral accent, distinct from the needs-input card.
+ */
+function CriticalUpdateCard({ msg }: { msg: ThreadMessage }) {
+  const meta = parseMeta(msg.meta);
+  return (
+    <div className="outcome-card outcome-card--update">
+      <span className="outcome-card__badge">Update</span>
+      <div className="outcome-card__body">
+        <p className="outcome-card__label">{meta.label ?? "Update from the org"}</p>
+        {msg.body ? <p className="outcome-card__desc">{msg.body}</p> : null}
+        {meta.refUrl ? (
+          <Link to={meta.refUrl} className="outcome-card__link">
+            {meta.refLabel ? `${meta.refLabel} →` : "View →"}
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A needs-input card (work-064): the org's async write-back that **parks the thread on the
+ * Owner** — the org needs a call to proceed. Deliberately the most visually prominent card
+ * (attention accent, "Needs you" badge) so the ask stands out from routine chatter and drives
+ * the unread badge / notification center (work-063).
+ */
+function NeedsInputCard({ msg }: { msg: ThreadMessage }) {
+  const meta = parseMeta(msg.meta);
+  return (
+    <div className="outcome-card outcome-card--needs-input">
+      <span className="outcome-card__badge">Needs you</span>
+      <div className="outcome-card__body">
+        <p className="outcome-card__label">{meta.label ?? "The org needs your input"}</p>
+        {msg.body ? <p className="outcome-card__desc">{msg.body}</p> : null}
+        {meta.refUrl ? (
+          <Link to={meta.refUrl} className="outcome-card__link">
+            {meta.refLabel ? `${meta.refLabel} →` : "View →"}
           </Link>
         ) : null}
       </div>

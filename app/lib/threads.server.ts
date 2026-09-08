@@ -1,7 +1,17 @@
-import { desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { desc, eq, inArray, isNotNull, isNull, max } from "drizzle-orm";
 import { db, ensureSchema } from "~/db";
-import { conversationMessages, conversations } from "~/db/schema";
-import type { BranchLink, MessageMeta, Thread, ThreadMessage, ThreadStatus } from "./threads";
+import { conversationMessages, conversations, threadReads } from "~/db/schema";
+import {
+  type BranchLink,
+  buildNotifications,
+  countUnread,
+  type MessageMeta,
+  NOTABLE_MESSAGE_TYPES,
+  type NotificationItem,
+  type Thread,
+  type ThreadMessage,
+  type ThreadStatus,
+} from "./threads";
 
 /**
  * CoS-Threads data layer (work-029, ADR-012). A **thread** is a `conversation`; its
@@ -295,6 +305,67 @@ export async function addGeneratedRequest(
   });
 }
 
+type OrgUpdateOpts = {
+  /** The card headline (e.g. "Triaged — ticket created", "Need your call on scope"). */
+  label: string;
+  /** Optional body prose under the headline. */
+  body?: string;
+  /** Optional deep link to the artifact this update is about (PR, ticket, PRD, …). */
+  refUrl?: string;
+  /** Short label for the deep link (e.g. the ticket id `work-064`). */
+  refLabel?: string;
+  /** The posting author (default `chief-of-staff`). */
+  author?: string;
+  /** Override the resulting turn/status (defaults per write-back type). */
+  status?: ThreadStatus;
+};
+
+/**
+ * The org's **async write-back** (work-064): a server-side process with **no launched Claude
+ * session** (the [[request-triage]] routine, an agent running a script) posts a message into a
+ * thread and moves its turn — the capability ADR-016 left as a read-only projection until now.
+ * This is the internal entry point Pillars I–II of [[prd-request-loop]] depend on; the
+ * scheduled routine that calls it is work-066.
+ *
+ * `postCriticalUpdate` records a **FYI** — a triage decision or progress note. The thread
+ * **stays the org's** (`working` by default): it's information, not a question. Rendered as a
+ * typed `critical-update` card and counted as notable org activity by the unread signal
+ * (work-063). Authored by the org (`agent` role), so it never enters the Human-Input Log.
+ */
+export async function postCriticalUpdate(threadId: number, opts: OrgUpdateOpts): Promise<void> {
+  await addMessage(threadId, "agent", opts.body ?? "", {
+    type: "critical-update",
+    status: opts.status ?? "working",
+    meta: orgUpdateMeta(opts),
+  });
+}
+
+/**
+ * The org's **async write-back** for a question (work-064): a server-side process posts a
+ * message that **parks the thread on the Owner** (`needs-you` by default) — the org needs the
+ * Owner's input to proceed. Rendered as a visually-distinct typed `needs-input` card and the
+ * strongest driver of the unread badge / notification center (work-063). Authored by the org
+ * (`agent` role), so it never enters the Human-Input Log. The counterpart to
+ * {@link postCriticalUpdate}, which stays the org's turn.
+ */
+export async function postNeedsInput(threadId: number, opts: OrgUpdateOpts): Promise<void> {
+  await addMessage(threadId, "agent", opts.body ?? "", {
+    type: "needs-input",
+    status: opts.status ?? "needs-you",
+    meta: orgUpdateMeta(opts),
+  });
+}
+
+/** Shared meta shape for the two write-back cards — author label + optional deep link. */
+function orgUpdateMeta(opts: OrgUpdateOpts): MessageMeta {
+  return {
+    author: opts.author ?? "chief-of-staff",
+    label: opts.label,
+    ...(opts.refUrl ? { refUrl: opts.refUrl } : {}),
+    ...(opts.refLabel ? { refLabel: opts.refLabel } : {}),
+  };
+}
+
 type AddOpts = {
   type?: string;
   status?: ThreadStatus;
@@ -389,4 +460,99 @@ export async function setStatus(threadId: number, status: ThreadStatus): Promise
     .update(conversations)
     .set({ status, updatedAt: Date.now() })
     .where(eq(conversations.id, threadId));
+}
+
+// --- Read-state, unread badge & notification center (work-063) -----------
+
+/**
+ * Mark a thread read (work-063): stamp `lastReadAt = now`, which clears its unread. Called when
+ * the Owner opens a thread. Single-user by invariant (INVARIANTS §II), so it's keyed by thread
+ * with no per-user scoping. Upsert — the first open inserts the row, later opens update it.
+ */
+export async function markThreadRead(threadId: number): Promise<void> {
+  await ensureSchema();
+  const now = Date.now();
+  await db
+    .insert(threadReads)
+    .values({ conversationId: threadId, lastReadAt: now })
+    .onConflictDoUpdate({ target: threadReads.conversationId, set: { lastReadAt: now } });
+}
+
+/** Map of thread id → the `at` of its newest org (`role = agent`) message. */
+async function lastOrgAtByThread(): Promise<Map<number, number>> {
+  const rows = await db
+    .select({ cid: conversationMessages.conversationId, lastAt: max(conversationMessages.at) })
+    .from(conversationMessages)
+    .where(eq(conversationMessages.role, "agent"))
+    .groupBy(conversationMessages.conversationId);
+  const map = new Map<number, number>();
+  for (const r of rows) if (r.lastAt != null) map.set(r.cid, r.lastAt);
+  return map;
+}
+
+/** Map of thread id → when the Owner last opened it. */
+async function lastReadByThread(): Promise<Map<number, number>> {
+  const rows = await db.select().from(threadReads);
+  return new Map(rows.map((r) => [r.conversationId, r.lastReadAt]));
+}
+
+/**
+ * The persistent unread badge count (work-063): how many **non-archived** threads have unread
+ * org activity — a `role = agent` message newer than the Owner's last open. Read by the root
+ * loader so the badge is present and accurate on every page. Owner-only threads never count;
+ * opening a thread clears it.
+ */
+export async function unreadThreadCount(): Promise<number> {
+  await ensureSchema();
+  const [threads, lastOrg, lastRead] = await Promise.all([
+    listThreads(), // non-archived only
+    lastOrgAtByThread(),
+    lastReadByThread(),
+  ]);
+  return countUnread(
+    threads.map((t) => ({
+      lastOrgAt: lastOrg.get(t.id) ?? null,
+      lastReadAt: lastRead.get(t.id) ?? null,
+    })),
+  );
+}
+
+/**
+ * The notification center feed (work-063): the Owner's `needs-you` threads plus recent notable
+ * org updates (`critical-update` / `needs-input` — work-064), newest-first, each linking to its
+ * thread. Fetches the raw rows and delegates ordering/dedup/unread flags to the pure
+ * {@link buildNotifications}. Archived threads never appear.
+ */
+export async function listNotifications(limit = 100): Promise<NotificationItem[]> {
+  await ensureSchema();
+  const [threads, lastOrg, lastRead, notable] = await Promise.all([
+    listThreads(), // non-archived only
+    lastOrgAtByThread(),
+    lastReadByThread(),
+    db
+      .select()
+      .from(conversationMessages)
+      .where(inArray(conversationMessages.type, [...NOTABLE_MESSAGE_TYPES]))
+      .orderBy(desc(conversationMessages.at))
+      .limit(limit),
+  ]);
+  const notifiable = threads.map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    updatedAt: t.updatedAt,
+    archivedAt: t.archivedAt,
+    lastOrgAt: lastOrg.get(t.id) ?? null,
+    lastReadAt: lastRead.get(t.id) ?? null,
+  }));
+  return buildNotifications(
+    notifiable,
+    notable.map((m) => ({
+      conversationId: m.conversationId,
+      type: m.type,
+      body: m.body,
+      meta: m.meta,
+      at: m.at,
+    })),
+  );
 }

@@ -12,10 +12,15 @@ import {
   launchThread,
   linkThreadSession,
   listArchivedThreads,
+  listNotifications,
   listThreads,
+  markThreadRead,
   orgFollowup,
+  postCriticalUpdate,
+  postNeedsInput,
   restoreThread,
   setStatus,
+  unreadThreadCount,
 } from "./threads.server";
 
 describe("Owner-initiated threads", () => {
@@ -276,6 +281,120 @@ describe("archive / restore threads (work-049)", () => {
     await restoreThread(t.id);
     expect((await listThreads()).some((x) => x.id === t.id)).toBe(true);
     expect((await listArchivedThreads()).some((x) => x.id === t.id)).toBe(false);
+  });
+});
+
+describe("org async write-back (work-064)", () => {
+  it("postCriticalUpdate posts an FYI card and keeps the thread the org's (working)", async () => {
+    const t = await createThread("Build the loop", "Please build the request loop.");
+    // Simulate a sessionless server-side process (a routine) posting a progress note.
+    await postCriticalUpdate(t.id, {
+      label: "Triaged — ticket created",
+      body: "Opened work-070 and routed it to the CTO.",
+      refUrl: "/work/070",
+      refLabel: "work-070",
+    });
+
+    const loaded = await getThread(t.id);
+    const card = loaded?.messages.at(-1);
+    expect(card?.type).toBe("critical-update");
+    expect(card?.role).toBe("agent"); // org-authored → never enters the Human-Input Log
+    expect(loaded?.thread.status).toBe("working"); // FYI: the thread stays the org's turn
+    const meta = parseMeta(card?.meta ?? null);
+    expect(meta.label).toBe("Triaged — ticket created");
+    expect(meta.author).toBe("chief-of-staff");
+    expect(meta.refUrl).toBe("/work/070");
+    expect(meta.refLabel).toBe("work-070");
+  });
+
+  it("postNeedsInput posts a question card and parks the thread on the Owner (needs-you)", async () => {
+    const t = await createThread("Scope call", "Kick this off.");
+    await setStatus(t.id, "working");
+    await postNeedsInput(t.id, {
+      label: "Need your call on scope",
+      body: "Ship the minimal cut, or the full surface? Blocks the estimate.",
+      author: "chief-product-officer",
+    });
+
+    const loaded = await getThread(t.id);
+    const card = loaded?.messages.at(-1);
+    expect(card?.type).toBe("needs-input");
+    expect(card?.role).toBe("agent");
+    expect(loaded?.thread.status).toBe("needs-you"); // parks the thread on the Owner
+    expect(parseMeta(card?.meta ?? null).author).toBe("chief-product-officer");
+  });
+
+  it("works with no launched session — an ordinary sessionless server call", async () => {
+    const t = await createThread("Sessionless", "No Claude session launched here.");
+    expect((await getThread(t.id))?.thread.launchedAt).toBeNull();
+    await postNeedsInput(t.id, { label: "A question with no session" });
+    const loaded = await getThread(t.id);
+    expect(loaded?.thread.launchedAt).toBeNull(); // still never launched
+    expect(loaded?.messages.some((m) => m.type === "needs-input")).toBe(true);
+  });
+
+  it("status can be overridden (e.g. a critical-update that closes the thread out)", async () => {
+    const t = await createThread("Override", "…");
+    await postCriticalUpdate(t.id, { label: "Done — nothing more needed", status: "closed" });
+    expect((await getThread(t.id))?.thread.status).toBe("closed");
+  });
+});
+
+describe("read-state, unread badge & notifications (work-063)", () => {
+  it("org write-back raises unread; opening the thread (markThreadRead) clears it", async () => {
+    const before = await unreadThreadCount();
+    const t = await createThread("Read me", "Owner opens this.");
+    // Owner-only activity so far → never unread; the count is unchanged.
+    expect(await unreadThreadCount()).toBe(before);
+
+    await postNeedsInput(t.id, { label: "A question" }); // org activity → unread
+    expect(await unreadThreadCount()).toBe(before + 1);
+
+    await markThreadRead(t.id); // opening the thread clears its unread
+    expect(await unreadThreadCount()).toBe(before);
+  });
+
+  it("a later org write-back after reading re-raises the thread's unread", async () => {
+    const t = await createThread("Re-raise", "…");
+    await markThreadRead(t.id);
+    const base = await unreadThreadCount();
+    await new Promise((r) => setTimeout(r, 2)); // ensure the message postdates the read stamp
+    await postCriticalUpdate(t.id, { label: "New update" });
+    expect(await unreadThreadCount()).toBe(base + 1);
+  });
+
+  it("listNotifications surfaces needs-you + notable updates newest-first, linking to threads", async () => {
+    const a = await createThread("Notif A", "…");
+    await postNeedsInput(a.id, { label: "Decide A" }); // parks the Owner + notable
+    const b = await createThread("Notif B", "…");
+    await postCriticalUpdate(b.id, { label: "FYI B" }); // stays the org's + notable
+
+    const notifs = await listNotifications();
+    const forA = notifs.find((n) => n.threadId === a.id);
+    const forB = notifs.find((n) => n.threadId === b.id);
+    expect(forA?.kind).toBe("needs-input");
+    expect(forA?.href).toBe(`/threads/${a.id}`);
+    expect(forB?.kind).toBe("critical-update");
+    // The whole feed is newest-first.
+    const ts = notifs.map((n) => n.ts);
+    expect([...ts].sort((x, y) => y - x)).toEqual(ts);
+  });
+
+  it("opening a thread clears its unread flag in the notification feed", async () => {
+    const t = await createThread("Clear flag", "…");
+    await postNeedsInput(t.id, { label: "Q" });
+    expect((await listNotifications()).find((n) => n.threadId === t.id)?.unread).toBe(true);
+    await markThreadRead(t.id);
+    expect((await listNotifications()).find((n) => n.threadId === t.id)?.unread).toBe(false);
+  });
+
+  it("archived threads never appear in the feed or the unread count", async () => {
+    const t = await createThread("Archive from notif", "…");
+    await postNeedsInput(t.id, { label: "Q" });
+    const before = await unreadThreadCount();
+    await archiveThread(t.id);
+    expect((await listNotifications()).some((n) => n.threadId === t.id)).toBe(false);
+    expect(await unreadThreadCount()).toBe(before - 1);
   });
 });
 

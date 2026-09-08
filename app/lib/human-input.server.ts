@@ -10,6 +10,7 @@ import {
   type ConsistencyInput,
   checkInputConsistency,
   type HumanInputEvent,
+  operatorInputText,
   type SpineItem,
   truncate,
 } from "./human-input";
@@ -109,6 +110,11 @@ type OperatorRecord = {
  * human-input/YYYY-MM.ndjson. We read it here so first-class Claude-session inputs
  * join the timeline instead of showing as a "capture pending" gap. Best-effort: a
  * missing dir (hook not installed) or a malformed line is skipped, never thrown.
+ *
+ * The hook records the *whole* submitted prompt, so harness-injected content rides in
+ * with it — background-task notifications, system reminders, CI events. We run each line
+ * through {@link operatorInputText} to keep only what the Owner actually typed, dropping
+ * lines that were purely injected. This is the Human-Input Log, not a prompt-stream dump.
  */
 async function readOperatorSessions(): Promise<HumanInputEvent[]> {
   const dir = join(controlPlaneHome(), "human-input");
@@ -136,8 +142,12 @@ async function readOperatorSessions(): Promise<HumanInputEvent[]> {
       } catch {
         continue;
       }
-      const text = rec.text?.trim();
-      if (!text || typeof rec.ts !== "number") continue;
+      if (typeof rec.text !== "string" || typeof rec.ts !== "number") continue;
+      // The hook captures the whole submitted prompt, including any harness-injected
+      // blocks (task-notifications, system-reminders, CI events). Keep only the Owner's
+      // own text; a line that was purely injected yields "" and is not human input.
+      const text = operatorInputText(rec.text);
+      if (!text) continue;
       events.push({
         id: `op:${file}:${i}`,
         ts: rec.ts,
