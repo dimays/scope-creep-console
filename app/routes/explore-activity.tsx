@@ -45,11 +45,23 @@ export default function ExploreActivity({ loaderData }: Route.ComponentProps) {
           <span className="console__count">{events.length}</span>
         </div>
         {events.length === 0 ? (
-          <p className="console__empty">
-            No activity captured yet. Delegations, spin-ups, and confers appear here once the
-            capture hook (<code>work-036</code>) is wired and the org runs — the log is local and
-            starts empty on a fresh clone.
-          </p>
+          <div className="empty-state">
+            <div className="empty-state__head">
+              <p className="empty-state__title">No activity captured yet</p>
+              <span className="empty-state__badge">Awaiting core · work-036</span>
+            </div>
+            <p className="empty-state__body">
+              This surface projects a structured activity log (<code>activity/*.ndjson</code> in the
+              control plane). Nothing writes that log yet: the capture hook that emits delegations,
+              spin-ups, and confers is an <strong>unbuilt feature in core scope-creep</strong> (
+              <code>work-036</code>, delegation-event-capture) — not a console bug. Once it lands
+              and the org runs, entries appear here automatically.
+            </p>
+            <p className="empty-state__body">
+              In the meantime, the org's recorded decisions and events live on the{" "}
+              <Link to="/explore/timeline">Timeline</Link> (the ledger).
+            </p>
+          </div>
         ) : (
           <div className="activity-feed">
             {events.map((e) => (

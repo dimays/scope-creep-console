@@ -2559,6 +2559,48 @@ a.org__tpl {
   }
 }
 
+/* Honest empty state (#9): an explanatory card that says why a surface is empty
+   and where the information lives in the meantime, instead of a bare line. */
+.empty-state {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  padding: 1.2rem 1.35rem;
+  max-width: 64ch;
+}
+.empty-state__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+.empty-state__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.empty-state__badge {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--sc-warn) 40%, var(--sc-border));
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 10%, transparent);
+}
+.empty-state__body {
+  margin: 0 0 0.7rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--sc-muted);
+}
+.empty-state__body:last-child {
+  margin-bottom: 0;
+}
+
 /* ── Explore design pass (Chief-Designer feedback) ──────────────────────────
    Shared vocabulary for the Templates / Docs / Loops / Schedules cleanups. */
 
