@@ -26,6 +26,7 @@ import {
   parseCadenceDecisions,
   parseFrontmatter,
   parseLoops,
+  parseRoadmapDeck,
   readAgent,
   readLoop,
   readRoutines,
@@ -139,6 +140,50 @@ describe("releasePackage (scope → package group)", () => {
   });
   it("returns an Other bucket for empty scope", () => {
     expect(releasePackage(undefined).key).toBe("other");
+  });
+});
+
+describe("parseRoadmapDeck (the forward plan)", () => {
+  const md = [
+    "# Roadmap Presentation 001",
+    "",
+    "- **Horizon:** next quarter",
+    "",
+    "## Themes",
+    "",
+    "### Theme 1: Finish the trust rails ([[cto]] · [[chief-reality-officer]])",
+    "Narrative one.",
+    "",
+    "### Theme 2: A Console that shows the org to itself ([[chief-designer]])",
+    "Narrative two.",
+    "",
+    "## Disposition",
+    "",
+    "_Pending the Owner_ (accepted / revised / deferred).",
+  ].join("\n");
+
+  it("extracts theme titles and owners", () => {
+    const deck = parseRoadmapDeck(md);
+    expect(deck.themes).toHaveLength(2);
+    expect(deck.themes[0]).toEqual({
+      title: "Finish the trust rails",
+      owners: ["cto", "chief-reality-officer"],
+    });
+    expect(deck.themes[1].title).toBe("A Console that shows the org to itself");
+  });
+
+  it("reads the horizon and normalizes the disposition", () => {
+    const deck = parseRoadmapDeck(md);
+    expect(deck.horizon).toBe("next quarter");
+    expect(deck.disposition).toBe("Pending");
+  });
+
+  it("degrades to empty on a deck with no themes/horizon/disposition", () => {
+    expect(parseRoadmapDeck("# Just a title\n\nsome prose")).toEqual({
+      themes: [],
+      horizon: undefined,
+      disposition: undefined,
+    });
   });
 });
 

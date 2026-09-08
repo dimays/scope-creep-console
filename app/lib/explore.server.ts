@@ -513,6 +513,77 @@ export async function listRoadmap(): Promise<ArtifactEntry[]> {
   return listArtifacts("roadmap");
 }
 
+// --- roadmap deck parsing: the forward plan, for the "where we're headed" strip (#8) ---
+
+/** One board-deck theme: its title and the executive owners named in the heading. */
+export type RoadmapTheme = { title: string; owners: string[] };
+export type RoadmapDeck = {
+  themes: RoadmapTheme[];
+  /** The `**Horizon:**` line, if the deck declares one. */
+  horizon?: string;
+  /** A normalized disposition label (Accepted | Revised | Deferred | Pending). */
+  disposition?: string;
+};
+
+function normalizeDisposition(line: string): string | undefined {
+  // The disposition line names the *options* in a parenthetical (e.g. "_Pending the
+  // Owner_ (accepted / revised / deferred)"), so match only the head clause before
+  // "(" — otherwise a still-Pending deck reads as Accepted off its own option list.
+  const s = (line.split("(")[0] ?? "").toLowerCase();
+  if (s.includes("pending")) return "Pending";
+  if (s.includes("accept")) return "Accepted";
+  if (s.includes("revis")) return "Revised";
+  if (s.includes("defer")) return "Deferred";
+  return undefined;
+}
+
+/**
+ * Parse a roadmap presentation's markdown into its forward-looking spine: the
+ * `### Theme N: <title> ([[owner]] · …)` headings, the optional `**Horizon:**`,
+ * and the `## Disposition` status. Pure + unit-tested. Everything is optional so
+ * a deck that omits a section (or a malformed one) degrades to empty, never invents.
+ */
+export function parseRoadmapDeck(md: string): RoadmapDeck {
+  const themes: RoadmapTheme[] = [];
+  const re = /^###\s+Theme[^:]*:\s*(.+?)\s*$/gm;
+  let m: RegExpExecArray | null = re.exec(md);
+  while (m !== null) {
+    const raw = m[1];
+    const owners = [...raw.matchAll(/\[\[([^\]]+)\]\]/g)].map((o) => o[1]);
+    const title = raw.replace(/\s*\(.*\)\s*$/, "").trim();
+    if (title) themes.push({ title, owners });
+    m = re.exec(md);
+  }
+  // Keep the horizon to its lead clause (before an em/en dash) so the strip's label
+  // stays a short phrase — e.g. "the next build cycle (~the coming weeks)".
+  const horizon = /\*\*Horizon:\*\*\s*(.+)/
+    .exec(md)?.[1]
+    ?.split(/\s+[—–-]\s+/)[0]
+    ?.trim();
+  const dispSection = /##\s+Disposition\s*\n([\s\S]*?)(?:\n#{1,2}\s|$)/.exec(md)?.[1] ?? "";
+  const dispLine =
+    dispSection
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? "";
+  return { themes, horizon, disposition: normalizeDisposition(dispLine) };
+}
+
+/** The latest roadmap presentation with its parsed forward plan, or null when
+ *  none exists. Reads only the head of the (newest-first) roadmap list. */
+export async function readRoadmapDeck(): Promise<{
+  entry: ArtifactEntry;
+  deck: RoadmapDeck;
+} | null> {
+  const all = await listRoadmap();
+  const entry = all[0];
+  if (!entry) return null;
+  const src = await readMd(join("roadmap", entry.file));
+  if (src === null) return { entry, deck: { themes: [] } };
+  const { body } = parseFrontmatter(src);
+  return { entry, deck: parseRoadmapDeck(body) };
+}
+
 export { agentDisplayName };
 
 // --- schedules: cloud routines + self-tuning cadence (work-052) -----------
