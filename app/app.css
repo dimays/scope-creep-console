@@ -1681,33 +1681,73 @@ a.console__item-name:hover {
   flex: 1;
 }
 
+/* Executives are collapsible cards (#2 redesign) so the reporting tree stays a
+   scannable stack of clear entities as headcount grows. The summary always
+   shows counts; reports + summon catalog live in the expandable body. */
 .org__execs {
   list-style: none;
-  margin: 0;
-  padding: 0 0 0 1rem;
-  border-left: 2px solid var(--sc-border);
-  margin-left: 0.8rem;
-}
-.org__exec {
-  margin-top: 1rem;
-  padding-left: 0.6rem;
-}
-.org__exec-head {
+  margin: 0.75rem 0 0;
+  padding: 0;
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.6rem;
 }
-.org__exec-name {
+.org-exec {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+}
+.org-exec__summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0.8rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: var(--sc-radius);
+}
+.org-exec__summary::-webkit-details-marker {
+  display: none;
+}
+.org-exec__summary:focus-visible {
+  outline: 2px solid var(--sc-accent);
+  outline-offset: -2px;
+}
+.org-exec__chevron {
+  color: var(--sc-muted);
+  font-size: 0.7rem;
+  transition: transform var(--sc-motion) var(--sc-ease);
+}
+.org-exec[open] .org-exec__chevron {
+  transform: rotate(90deg);
+}
+.org-exec__name {
   font-weight: 600;
+  font-size: 1rem;
   color: var(--sc-text);
   text-decoration: none;
 }
-.org__exec-name:hover {
+.org-exec__name:hover {
   color: var(--sc-accent);
 }
-.org__counts {
+.org-exec__counts {
+  margin-left: auto;
   font-size: 0.75rem;
+  color: var(--sc-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.org-exec__body {
+  padding: 0.1rem 1.1rem 1rem;
+  border-top: 1px solid var(--sc-border);
+}
+.org-exec__section-label {
+  margin: 0.95rem 0 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--sc-muted);
 }
 .org__empty {
