@@ -19,7 +19,8 @@
     "deploy": "echo 'GATED (INVARIANTS §III): run `fly deploy` yourself.' && exit 1",
     "destroy": "echo 'GATED (INVARIANTS §III): run `fly apps destroy scope-creep-console` yourself.' && exit 1",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "triage": "tsx scripts/triage.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
@@ -43,6 +44,7 @@
     "@types/react-dom": "^19.2.3",
     "drizzle-kit": "^0.28.1",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vite": "8.2.2",
     "vitest": "^3.0.0"

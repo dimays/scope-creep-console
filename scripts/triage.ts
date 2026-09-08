@@ -20,8 +20,16 @@
  *       Never merges. `ticket.json` is a {@link TicketSpec} minus `num` (auto-assigned unless
  *       given). Auto-merge of a simple accept is the gated ADR-022 finish line, not done here.
  *
- * Run from the console checkout with the environment ADR-024 describes. Example (dry, local):
- *   DATABASE_URL=file:./data/app.db bun run scripts/triage.ts sweep
+ * Run under **Node (via tsx), NOT `bun run`.** Bun's fetch is dropped by the cloud routine's
+ * egress proxy (`ECONNRESET` / `ws_closed_mid_exchange`), so `bun run scripts/triage.ts` fails
+ * through the proxy even though the same request succeeds under Node — the request-triage
+ * Routine must invoke the Node path. See work-065 / ADR-024. The `triage` package.json script
+ * (`tsx scripts/triage.ts`) is the reliable Node entry point:
+ *   npm run triage -- sweep                         # the Routine's invocation (Node/tsx)
+ *   node --import tsx scripts/triage.ts sweep        # equivalent, no npm indirection
+ *
+ * Run from the console checkout with the environment ADR-024 describes. Example (local file db):
+ *   DATABASE_URL=file:./data/app.db npm run triage -- sweep
  */
 
 import { readFile } from "node:fs/promises";
