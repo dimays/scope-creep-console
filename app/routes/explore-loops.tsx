@@ -26,8 +26,8 @@ export default function ExploreLoops({ loaderData }: Route.ComponentProps) {
           <p className="console__eyebrow">Scope Creep</p>
           <h1 className="console__title">Loops</h1>
         </div>
-        <Link to="/explore" className="console__meta">
-          ← explore
+        <Link to="/" className="console__meta">
+          ← overview
         </Link>
       </header>
       <ExploreNav />

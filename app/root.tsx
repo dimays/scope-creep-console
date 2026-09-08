@@ -32,9 +32,6 @@ function TopNav() {
       <NavLink to="/" end className={linkClass}>
         Console
       </NavLink>
-      <NavLink to="/explore" className={linkClass}>
-        Explore
-      </NavLink>
       <NavLink to="/work" className={linkClass}>
         Work
       </NavLink>
