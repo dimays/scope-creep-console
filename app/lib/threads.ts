@@ -124,3 +124,131 @@ export function parseMeta(raw: string | null): MessageMeta {
     return {};
   }
 }
+
+// --- Read-state & unread (work-063) --------------------------------------
+// "Unread" is real, not derived from `status` alone (that was the only signal before). A
+// thread has unread org activity when its newest org message (`role = agent`, so the Owner's
+// own replies never mark his thread unread) is newer than when he last opened it. Opening a
+// thread stamps `lastReadAt = now`, which clears its unread. These are pure so the badge count
+// and the notification feed read from one definition; the DB shapes live in threads.server.ts.
+
+/** The two timestamps that decide a thread's unread state (see {@link isUnread}). */
+export type ThreadUnread = {
+  /** The `at` of the thread's newest org (`role = agent`) message, or null if it has none. */
+  lastOrgAt: number | null;
+  /** When the Owner last opened the thread, or null if never. */
+  lastReadAt: number | null;
+};
+
+/**
+ * Whether a thread has **unread org activity**: it has an org message, and either the Owner
+ * never opened it or its newest org message postdates his last open. Owner-only activity
+ * (`lastOrgAt == null`) is never unread — a thread he just opened isn't "new" to him.
+ */
+export function isUnread(u: ThreadUnread): boolean {
+  return u.lastOrgAt != null && (u.lastReadAt == null || u.lastOrgAt > u.lastReadAt);
+}
+
+/** How many threads have unread org activity — the persistent nav badge count (work-063). */
+export function countUnread(items: Iterable<ThreadUnread>): number {
+  let n = 0;
+  for (const u of items) if (isUnread(u)) n++;
+  return n;
+}
+
+// --- Notification center (work-063) --------------------------------------
+
+/** What a notification row represents: a parked thread, or a specific notable org write-back. */
+export type NotificationKind = "needs-you" | "needs-input" | "critical-update";
+
+/** A single row in the notification center — always links back to its thread. */
+export type NotificationItem = {
+  threadId: number;
+  title: string;
+  kind: NotificationKind;
+  /** The headline to show (the card's label, or the thread title for a bare needs-you). */
+  label: string;
+  /** Ordering key — the message time, or the thread's `updatedAt` for a bare needs-you. */
+  ts: number;
+  /** Whether the thread still has unread org activity (drives visual emphasis). */
+  unread: boolean;
+  href: string;
+};
+
+/** A thread as the notification builder needs it — plus its resolved read-state timestamps. */
+export type NotifiableThread = {
+  id: number;
+  title: string;
+  status: string;
+  updatedAt: number;
+  archivedAt: number | null;
+  lastOrgAt: number | null;
+  lastReadAt: number | null;
+};
+
+/** A notable org message as the builder needs it (a `critical-update` / `needs-input` row). */
+export type NotifiableMessage = {
+  conversationId: number;
+  type: string;
+  body: string;
+  meta: string | null;
+  at: number;
+};
+
+/**
+ * Build the notification feed (work-063): what needs the Owner (his `needs-you` threads) plus
+ * recent notable org updates (`critical-update` / `needs-input`), **newest-first**, each linking
+ * to its thread. Archived threads never appear. Dedup: a `needs-you` thread that already shows
+ * up as a notable message isn't repeated as a bare "parked" row — the message is the richer
+ * signal — so a thread parked by a plain `orgFollowup` (no typed card) still surfaces as a
+ * needs-you row. Pure: the caller supplies threads (with resolved read-state) and the notable
+ * messages; ordering, dedup, and unread flags are decided here so they're unit-testable.
+ */
+export function buildNotifications(
+  threads: NotifiableThread[],
+  notableMessages: NotifiableMessage[],
+): NotificationItem[] {
+  const byId = new Map<number, NotifiableThread>();
+  for (const t of threads) {
+    if (t.archivedAt == null) byId.set(t.id, t);
+  }
+  const unreadOf = (t: NotifiableThread) =>
+    isUnread({ lastOrgAt: t.lastOrgAt, lastReadAt: t.lastReadAt });
+
+  const items: NotificationItem[] = [];
+  const threadsWithMessage = new Set<number>();
+
+  for (const m of notableMessages) {
+    if (!isNotableUpdate(m.type)) continue;
+    const t = byId.get(m.conversationId);
+    if (!t) continue; // unknown or archived thread → skip
+    threadsWithMessage.add(t.id);
+    const meta = parseMeta(m.meta);
+    items.push({
+      threadId: t.id,
+      title: threadTitle(t),
+      kind: m.type as NotificationKind,
+      label: meta.label ?? m.body ?? threadTitle(t),
+      ts: m.at,
+      unread: unreadOf(t),
+      href: `/threads/${t.id}`,
+    });
+  }
+
+  for (const t of byId.values()) {
+    if (t.status !== "needs-you") continue;
+    if (threadsWithMessage.has(t.id)) continue; // already shown via its notable message
+    items.push({
+      threadId: t.id,
+      title: threadTitle(t),
+      kind: "needs-you",
+      label: threadTitle(t),
+      ts: t.updatedAt,
+      unread: unreadOf(t),
+      href: `/threads/${t.id}`,
+    });
+  }
+
+  // Newest-first; tie-break by thread id (desc) so ordering is deterministic.
+  return items.sort((a, b) => b.ts - a.ts || b.threadId - a.threadId);
+}

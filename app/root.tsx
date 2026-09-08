@@ -1,3 +1,4 @@
+import { Badge } from "@scope-creep/design";
 import {
   isRouteErrorResponse,
   Links,
@@ -11,20 +12,26 @@ import {
 
 import { InterruptedBanner } from "~/components/state";
 import { readInterruption } from "~/lib/processing.server";
+import { unreadThreadCount } from "~/lib/threads.server";
 import type { Route } from "./+types/root";
 import "@scope-creep/design/tokens.css";
 import "./app.css";
 
 /**
- * App-wide processing state (work-011): the one global interruption fact, read on every
- * navigation so the banner + greyed-out shell are present on any page while the backend is
- * blocked, and gone the instant it resumes.
+ * App-wide shell facts, read on every navigation so they're present on any page:
+ * - the one global interruption fact (work-011) — the banner + greyed-out shell;
+ * - the unread-thread count (work-063) — the persistent nav badge. Best-effort: a DB hiccup
+ *   yields 0 rather than breaking the whole shell (this loader gates every page).
  */
 export async function loader(_: Route.LoaderArgs) {
-  return { interruption: await readInterruption() };
+  const [interruption, unread] = await Promise.all([
+    readInterruption(),
+    unreadThreadCount().catch(() => 0),
+  ]);
+  return { interruption, unread };
 }
 
-function TopNav() {
+function TopNav({ unread }: { unread: number }) {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? "topnav__link topnav__link--active" : "topnav__link";
   return (
@@ -40,6 +47,21 @@ function TopNav() {
       </NavLink>
       <NavLink to="/threads" className={linkClass}>
         Threads
+      </NavLink>
+      {/* The notification center + its persistent unread badge (work-063), visible on every
+          page. The badge only renders when there's something unread, so a caught-up nav is
+          quiet; its accessible name carries the full count for screen readers. */}
+      <NavLink to="/notifications" className={linkClass}>
+        Notifications
+        {unread > 0 ? (
+          <Badge
+            variant="count"
+            className="topnav__badge"
+            label={`${unread} thread${unread === 1 ? "" : "s"} with unread activity`}
+          >
+            {unread}
+          </Badge>
+        ) : null}
       </NavLink>
     </nav>
   );
@@ -63,6 +85,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // error path), so read defensively.
   const data = useRouteLoaderData<typeof loader>("root");
   const interruption = data?.interruption ?? null;
+  const unread = data?.unread ?? 0;
 
   return (
     <html lang="en">
@@ -77,7 +100,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <TopNav />
+        <TopNav unread={unread} />
         {interruption ? <InterruptedBanner interruption={interruption} /> : null}
         {/* While blocked, the working surface is dimmed and made inert — submitting into a
             paused backend would only fail — but the top nav stays live so the Owner can

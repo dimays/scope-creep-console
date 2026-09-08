@@ -226,6 +226,25 @@ body {
   color: var(--sc-accent);
 }
 
+/* Persistent unread badge on the Notifications nav link (work-063). A small attention pill
+   riding the link; only rendered when unread > 0, so a caught-up nav stays quiet. */
+.topnav__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  margin-left: 0.35rem;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  background: var(--sc-attention);
+  color: var(--sc-bg);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+}
+
 /* explore sub-nav */
 .explore-nav {
   display: flex;
@@ -972,6 +991,75 @@ a.console__item-name:hover {
   margin: 0.2rem 0 0;
   font-size: 0.85rem;
   color: var(--sc-muted);
+}
+
+/* Notification center (work-063): a newest-first feed of parked threads + notable org
+   updates, each row linking to its thread. Unread rows carry a left accent + a dot. */
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.notif-row {
+  border: 1px solid var(--sc-border);
+  border-left: 3px solid transparent;
+  border-radius: 10px;
+  background: var(--sc-surface);
+}
+
+.notif-row--unread {
+  border-left-color: var(--sc-attention);
+}
+
+.notif-row__link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  text-decoration: none;
+  color: var(--sc-text);
+}
+
+.notif-row__link:hover .notif-row__label {
+  color: var(--sc-accent);
+}
+
+.notif-row__kind {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sc-muted);
+  min-width: 6.5rem;
+}
+
+.notif-row__kind--needs-you,
+.notif-row__kind--needs-input {
+  color: var(--sc-attention);
+  font-weight: 700;
+}
+
+.notif-row__label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.notif-row__thread {
+  flex-shrink: 0;
+  color: var(--sc-muted);
+  font-size: 0.8rem;
+}
+
+.notif-row__dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--sc-attention);
 }
 
 /* The forward-link "Branches" list on a parent thread. */
