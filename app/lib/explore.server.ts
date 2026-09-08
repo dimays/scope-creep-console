@@ -584,6 +584,50 @@ export async function readRoadmapDeck(): Promise<{
   return { entry, deck: parseRoadmapDeck(body) };
 }
 
+// --- release "Now" state: what the current milestone delivered + its honest gap (#8) ---
+
+/** Strip the markdown a release body carries (wikilinks, emphasis, code spans) so a
+ *  sentence can render as plain text in the compact Roadmap "Now" card. */
+function stripInlineMd(s: string): string {
+  return s
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
+    .replace(/\[\[([^\]]+)\]\]/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The first `n` sentences of a block, markdown stripped — keeps the "Now" card terse. */
+function firstSentences(text: string, n: number): string {
+  const clean = stripInlineMd(text);
+  const parts = clean.match(/[^.!?]+[.!?]+(\s|$)/g);
+  return (parts ? parts.slice(0, n).join(" ") : clean).trim();
+}
+
+/** What the current release delivered ("milestone") and the shortcoming it carries
+ *  forward ("residual"), for the Roadmap "Now" card — drawn from the release notes so
+ *  the card stays honest and non-repetitive with the deck. */
+export type ReleaseNow = { milestone?: string; residual?: string };
+export function parseReleaseNow(md: string): ReleaseNow {
+  const highlights = /##\s+Highlights\s*\n([\s\S]*?)(?=\n##\s|$)/.exec(md)?.[1]?.trim();
+  const milestone = highlights ? firstSentences(highlights, 1) : undefined;
+  const residualRaw = /\*\*Honest residual:\*\*\s*([\s\S]*?)(?=\n\s*-\s|\n\s*\n|\n##\s|$)/.exec(
+    md,
+  )?.[1];
+  const residual = residualRaw ? firstSentences(residualRaw, 1) : undefined;
+  return { milestone, residual };
+}
+
+/** The newest release's "Now" state, or null when there is no release to read. */
+export async function readReleaseNow(): Promise<ReleaseNow | null> {
+  const latest = (await listReleases())[0];
+  if (!latest) return null;
+  const src = await readMd(join("releases", latest.file));
+  if (src === null) return null;
+  const { body } = parseFrontmatter(src);
+  return parseReleaseNow(body);
+}
+
 export { agentDisplayName };
 
 // --- schedules: cloud routines + self-tuning cadence (work-052) -----------

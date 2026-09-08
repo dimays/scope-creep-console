@@ -2,7 +2,13 @@ import { Link } from "react-router";
 import { ExploreNav } from "~/components/explore-nav";
 import { FeedbackMount } from "~/components/feedback-mount";
 import { agentDisplayName } from "~/lib/display-name";
-import { listReleases, listRoadmap, readRoadmapDeck, releaseTier } from "~/lib/explore.server";
+import {
+  listReleases,
+  listRoadmap,
+  readReleaseNow,
+  readRoadmapDeck,
+  releaseTier,
+} from "~/lib/explore.server";
 import type { Route } from "./+types/explore-roadmap";
 
 export function meta(_: Route.MetaArgs) {
@@ -10,14 +16,19 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader(_: Route.LoaderArgs) {
-  const [all, releases, deckRes] = await Promise.all([
+  const [all, releases, deckRes, releaseNow] = await Promise.all([
     listRoadmap(),
     listReleases(),
     readRoadmapDeck(),
+    readReleaseNow(),
   ]);
   const shipped = releases
     .filter((r) => r.version)
     .map((r) => ({ slug: r.slug, version: r.version as string, tier: releaseTier(r.version) }));
+  // The current release's codename (the parenthetical in its H1, e.g. "Autonomous
+  // governance") + what it delivered and the gap it carries forward — the "Now" content.
+  const current = releases[0] ?? null;
+  const codename = current ? /\(([^)]+)\)\s*$/.exec(current.title)?.[1] : undefined;
   return {
     latest: all[0] ?? null,
     history: all.slice(1),
@@ -26,11 +37,27 @@ export async function loader(_: Route.LoaderArgs) {
     disposition: deckRes?.deck.disposition ?? null,
     shipped,
     currentVersion: shipped[0]?.version ?? null,
+    codename: codename ?? null,
+    milestone: releaseNow?.milestone ?? current?.description ?? null,
+    knownGap: releaseNow?.residual ?? null,
+    currentReleaseSlug: current?.slug ?? null,
   };
 }
 
 export default function ExploreRoadmap({ loaderData }: Route.ComponentProps) {
-  const { latest, history, themes, horizon, disposition, shipped, currentVersion } = loaderData;
+  const {
+    latest,
+    history,
+    themes,
+    horizon,
+    disposition,
+    shipped,
+    currentVersion,
+    codename,
+    milestone,
+    knownGap,
+    currentReleaseSlug,
+  } = loaderData;
   return (
     <main className="console">
       <header className="console__header">
@@ -78,6 +105,7 @@ export default function ExploreRoadmap({ loaderData }: Route.ComponentProps) {
             <p className="roadmap-stage__now-version">
               {currentVersion ? `v${currentVersion}` : "—"}
             </p>
+            {codename && <p className="roadmap-stage__codename">{codename}</p>}
             <p className="roadmap-stage__sub">
               {latest.date ? `as of ${latest.date}` : "current deck"}
               {disposition && (
@@ -86,6 +114,23 @@ export default function ExploreRoadmap({ loaderData }: Route.ComponentProps) {
                 </span>
               )}
             </p>
+            {milestone && (
+              <div className="roadmap-now-block">
+                <p className="roadmap-now-block__label">Delivered</p>
+                <p className="roadmap-now-block__text">{milestone}</p>
+              </div>
+            )}
+            {knownGap && (
+              <div className="roadmap-now-block">
+                <p className="roadmap-now-block__label roadmap-now-block__label--gap">Known gap</p>
+                <p className="roadmap-now-block__text">{knownGap}</p>
+              </div>
+            )}
+            {currentReleaseSlug && (
+              <Link to={`/explore/docs/${currentReleaseSlug}`} className="roadmap-now-block__link">
+                Release notes →
+              </Link>
+            )}
           </div>
 
           <span className="roadmap-strip__arrow" aria-hidden="true">

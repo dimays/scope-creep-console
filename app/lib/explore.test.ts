@@ -26,6 +26,7 @@ import {
   parseCadenceDecisions,
   parseFrontmatter,
   parseLoops,
+  parseReleaseNow,
   parseRoadmapDeck,
   readAgent,
   readLoop,
@@ -183,6 +184,43 @@ describe("parseRoadmapDeck (the forward plan)", () => {
       themes: [],
       horizon: undefined,
       disposition: undefined,
+    });
+  });
+});
+
+describe("parseReleaseNow (current milestone + honest gap)", () => {
+  const md = [
+    "# Release 002 — v0.2.0",
+    "",
+    "## Highlights",
+    "The org can now merge its own routine code without the Owner's approval. This release",
+    "built the five mechanical rails [[adr-022]] required.",
+    "",
+    "## Notes",
+    "- **Hand-seeded backfill** assembled from the ledger.",
+    "- **Honest residual:** the `owner-approved` escalation marker is agent-forgeable until",
+    "  [[adr-023]] provisions a restricted identity. Recorded in [[adr-022]].",
+    "- Another note.",
+  ].join("\n");
+
+  it("takes the milestone from the Highlights lead sentence, markdown stripped", () => {
+    const now = parseReleaseNow(md);
+    expect(now.milestone).toBe(
+      "The org can now merge its own routine code without the Owner's approval.",
+    );
+  });
+
+  it("takes the known gap from the Honest residual note, stopping at the next bullet", () => {
+    const now = parseReleaseNow(md);
+    expect(now.residual).toBe(
+      "the owner-approved escalation marker is agent-forgeable until adr-023 provisions a restricted identity.",
+    );
+  });
+
+  it("degrades to empty when the sections are absent", () => {
+    expect(parseReleaseNow("# Release\n\nno structured sections")).toEqual({
+      milestone: undefined,
+      residual: undefined,
     });
   });
 });
