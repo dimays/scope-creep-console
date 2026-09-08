@@ -2230,3 +2230,179 @@ a.org__tpl {
     transform: translateY(6px) scale(0.98);
   }
 }
+
+/* ── Explore design pass (Chief-Designer feedback) ──────────────────────────
+   Shared vocabulary for the Templates / Docs / Loops / Schedules cleanups. */
+
+/* Skill / capability chips — a wrapping row of quiet, self-contained pills.
+   Replaces the old `.console__tag` reuse inside `.org__skills`, whose
+   `margin-left:auto` made every chip absorb the free space and scatter to the
+   right edge (the ragged, "justified" mess). These sit left-to-right and wrap. */
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--sc-border);
+  background: var(--sc-tag-bg);
+  color: var(--sc-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+
+/* A generic lifecycle status pill (active | proposed | idle | retired), shared
+   by Loops and Schedules. Mirrors `.org__status` but lives outside the org
+   namespace and adds the `proposed` state the registries use. */
+.status-pill {
+  flex: none;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: var(--sc-muted);
+  background: var(--sc-tag-bg);
+}
+.status-pill--active {
+  color: var(--sc-success);
+  background: color-mix(in srgb, var(--sc-success) 14%, transparent);
+}
+.status-pill--proposed {
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 14%, transparent);
+}
+.status-pill--idle {
+  color: var(--sc-warn);
+  background: color-mix(in srgb, var(--sc-warn) 14%, transparent);
+}
+.status-pill--retired {
+  color: var(--sc-muted);
+  border-color: var(--sc-border);
+  background: transparent;
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+/* Collapsible doc sections (Docs tab). Native <details>/<summary> so it works
+   without JS; collapsed by default to tame the 100+-doc scroll, each header
+   carrying a count badge. */
+.doc-section {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  margin-bottom: 0.6rem;
+}
+.doc-section__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: var(--sc-radius);
+}
+.doc-section__summary::-webkit-details-marker {
+  display: none;
+}
+.doc-section__summary:hover {
+  color: var(--sc-accent);
+}
+.doc-section__summary:focus-visible {
+  outline: 2px solid var(--sc-accent);
+  outline-offset: -2px;
+}
+.doc-section__chevron {
+  color: var(--sc-muted);
+  font-size: 0.7rem;
+  transition: transform var(--sc-motion) var(--sc-ease);
+}
+.doc-section[open] .doc-section__chevron {
+  transform: rotate(90deg);
+}
+.doc-section__name {
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+.doc-section__summary .console__count {
+  margin-left: auto;
+}
+.doc-section__body {
+  padding: 0.35rem 1.1rem 0.85rem;
+  border-top: 1px solid var(--sc-border);
+}
+
+/* Loop cards (Loops tab) — a card per governed procedure, surfacing the
+   one-line description the registry already carries, plus owner + status. */
+.loop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.loop-card__desc {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--sc-text);
+  flex: 1;
+}
+.loop-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+.loop-card__owner {
+  color: var(--sc-muted);
+  text-decoration: none;
+}
+.loop-card__owner:hover {
+  color: var(--sc-accent);
+}
+
+/* Schedule cards (Schedules tab) — one card per cloud routine, with a labeled
+   field grid so cadence / self-tune bounds / model line up and breathe. */
+.schedule-card {
+  display: flex;
+  flex-direction: column;
+}
+.schedule-card__meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0 1rem;
+}
+.schedule-card__meta dt {
+  margin: 0;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sc-muted);
+  align-self: center;
+}
+.schedule-card__meta dd {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--sc-text);
+}
+.schedule-card__model {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+}
+.schedule-card__manage {
+  margin-top: auto;
+  font-size: 0.8rem;
+  color: var(--sc-accent);
+  text-decoration: none;
+}
+.schedule-card__manage:hover {
+  text-decoration: underline;
+}

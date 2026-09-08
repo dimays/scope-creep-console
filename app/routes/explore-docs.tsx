@@ -32,20 +32,32 @@ export default function ExploreDocs({ loaderData }: Route.ComponentProps) {
         </div>
       </header>
       <ExploreNav />
+      <p className="doc-path">
+        Charter, standards, ADRs, product specs, and loops — grouped and collapsed. Open a section
+        to browse it.
+      </p>
       {groups.map((group) => (
-        <section key={group.group} className="doc-group">
-          <h2 className="doc-group__title">{group.group}</h2>
-          <ul className="console__list">
-            {group.docs.map((doc) => (
-              <li key={doc.slug} className="doc-row">
-                <Link to={`/explore/docs/${doc.slug}`} className="console__item-name">
-                  {doc.title}
-                </Link>
-                {doc.status && <span className="console__tag">{doc.status}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
+        <details key={group.group} className="doc-section">
+          <summary className="doc-section__summary">
+            <span className="doc-section__chevron" aria-hidden="true">
+              ▶
+            </span>
+            <span className="doc-section__name">{group.group}</span>
+            <span className="console__count">{group.docs.length}</span>
+          </summary>
+          <div className="doc-section__body">
+            <ul className="console__list">
+              {group.docs.map((doc) => (
+                <li key={doc.slug} className="doc-row">
+                  <Link to={`/explore/docs/${doc.slug}`} className="console__item-name">
+                    {doc.title}
+                  </Link>
+                  {doc.status && <span className="console__tag">{doc.status}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </details>
       ))}
     </main>
   );
