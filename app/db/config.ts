@@ -5,7 +5,10 @@
  *
  * ADR-024 makes the store **remote-capable**: the same `@libsql`/Drizzle client, same sqlite
  * dialect, same generated migrations, pointed at a hosted `libsql://…` endpoint by a
- * connection-string change — never a rewrite. Two env vars carry it:
+ * connection-string change — never a rewrite. Two values carry it — a URL and a token —
+ * each read from a `SCOPE_CREEP_DB_*` name first (safe to export in a personal shell
+ * profile), then a `DATABASE_*` fallback (what the cloud routine's env injects). See
+ * {@link resolveDbConfig}. Canonically:
  *
  *   - `DATABASE_URL`        — `file:./data/app.db` locally (the default), a hosted
  *                             `libsql://<db>.turso.io` (or `https://…`) endpoint in the
@@ -68,25 +71,48 @@ export type DbConfig = {
   remote: boolean;
 };
 
+/** First env value that is a non-empty (trimmed) string, else undefined. Lets a namespaced
+ * `SCOPE_CREEP_DB_*` var take precedence over the generic `DATABASE_*` fallback, while an
+ * empty export (`export SCOPE_CREEP_DB_URL=`) is treated as unset rather than shadowing. */
+function firstSet(...vals: (string | undefined)[]): string | undefined {
+  for (const v of vals) {
+    const t = v?.trim();
+    if (t) return t;
+  }
+  return undefined;
+}
+
 /**
  * Resolve the libSQL client config from the environment. Throws — loudly, at boot — when a
  * remote endpoint is configured without its scoped auth token, rather than silently
  * connecting tokenless or falling back to a local db (which would be the "silently empty
  * thread list" ADR-024 forbids). A local file/in-memory url ignores any stray token.
+ *
+ * Each field reads the first set of two names — the `SCOPE_CREEP_DB_*` namespaced name (safe
+ * to export in a personal `.zprofile` without colliding with other apps), then the
+ * `DATABASE_*` fallback the cloud routine's environment injects (ADR-025) and the
+ * conventional local name:
+ *   URL   — `SCOPE_CREEP_DB_URL`        → `DATABASE_URL`        → `file:./data/app.db`
+ *   token — `SCOPE_CREEP_DB_AUTH_TOKEN` → `DATABASE_AUTH_TOKEN`
  */
 export function resolveDbConfig(
-  env: { DATABASE_URL?: string; DATABASE_AUTH_TOKEN?: string } = process.env,
+  env: {
+    SCOPE_CREEP_DB_URL?: string;
+    SCOPE_CREEP_DB_AUTH_TOKEN?: string;
+    DATABASE_URL?: string;
+    DATABASE_AUTH_TOKEN?: string;
+  } = process.env,
 ): DbConfig {
-  const url = env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
+  const url = firstSet(env.SCOPE_CREEP_DB_URL, env.DATABASE_URL) ?? DEFAULT_DATABASE_URL;
   const remote = isRemoteUrl(url);
-  const authToken = env.DATABASE_AUTH_TOKEN?.trim() || undefined;
+  const authToken = firstSet(env.SCOPE_CREEP_DB_AUTH_TOKEN, env.DATABASE_AUTH_TOKEN);
 
   if (remote && !authToken) {
     throw new Error(
-      `DATABASE_URL points at a remote libSQL endpoint (${url}) but DATABASE_AUTH_TOKEN is not set. ` +
+      `The thread store URL points at a remote libSQL endpoint (${url}) but no auth token is set. ` +
         "A remote thread store requires its own scoped auth token (ADR-024, INVARIANTS §9). " +
-        "Set DATABASE_AUTH_TOKEN in the environment, or point DATABASE_URL at a local file db " +
-        `(${DEFAULT_DATABASE_URL}) for local development.`,
+        "Set SCOPE_CREEP_DB_AUTH_TOKEN (or DATABASE_AUTH_TOKEN) in the environment, or point the " +
+        `URL at a local file db (${DEFAULT_DATABASE_URL}) for local development.`,
     );
   }
 

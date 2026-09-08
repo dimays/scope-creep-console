@@ -26,14 +26,16 @@
     "@libsql/client": "^0.14.0",
     "@react-router/node": "8.3.1",
     "@react-router/serve": "8.3.1",
-    "@scope-creep/design": "github:dimays/scope-creep-design#v0.4.0",
-    "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0",
     "drizzle-orm": "^0.36.4",
     "isbot": "^5.1.36",
     "marked": "^18.0.11",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "8.3.1"
+  },
+  "optionalDependencies": {
+    "@scope-creep/design": "github:dimays/scope-creep-design#v0.4.0",
+    "@scope-creep/ext-feedback": "github:dimays/scope-creep-ext-feedback#v0.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

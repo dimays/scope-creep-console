@@ -110,6 +110,45 @@ describe("resolveDbConfig (work-065, ADR-024)", () => {
   it("treats a blank/whitespace token as missing for a remote endpoint", () => {
     expect(() =>
       resolveDbConfig({ DATABASE_URL: "libsql://x.turso.io", DATABASE_AUTH_TOKEN: "   " }),
-    ).toThrow(/DATABASE_AUTH_TOKEN/);
+    ).toThrow(/AUTH_TOKEN/);
+  });
+
+  it("accepts the namespaced SCOPE_CREEP_DB_* names", () => {
+    const cfg = resolveDbConfig({
+      SCOPE_CREEP_DB_URL: "libsql://ns.turso.io",
+      SCOPE_CREEP_DB_AUTH_TOKEN: "tok_ns",
+    });
+    expect(cfg.remote).toBe(true);
+    expect(cfg.url).toBe("https://ns.turso.io");
+    expect(cfg.authToken).toBe("tok_ns");
+  });
+
+  it("prefers SCOPE_CREEP_DB_* over DATABASE_* when both are set", () => {
+    const cfg = resolveDbConfig({
+      SCOPE_CREEP_DB_URL: "libsql://ns.turso.io",
+      SCOPE_CREEP_DB_AUTH_TOKEN: "tok_ns",
+      DATABASE_URL: "libsql://legacy.turso.io",
+      DATABASE_AUTH_TOKEN: "tok_legacy",
+    });
+    expect(cfg.url).toBe("https://ns.turso.io");
+    expect(cfg.authToken).toBe("tok_ns");
+  });
+
+  it("falls back to DATABASE_* when the namespaced vars are unset (the cloud routine env)", () => {
+    const cfg = resolveDbConfig({
+      DATABASE_URL: "libsql://cloud.turso.io",
+      DATABASE_AUTH_TOKEN: "tok_cloud",
+    });
+    expect(cfg.url).toBe("https://cloud.turso.io");
+    expect(cfg.authToken).toBe("tok_cloud");
+  });
+
+  it("treats an empty namespaced export as unset and uses the fallback", () => {
+    const cfg = resolveDbConfig({
+      SCOPE_CREEP_DB_URL: "   ",
+      DATABASE_URL: "libsql://fallback.turso.io",
+      DATABASE_AUTH_TOKEN: "tok",
+    });
+    expect(cfg.url).toBe("https://fallback.turso.io");
   });
 });
