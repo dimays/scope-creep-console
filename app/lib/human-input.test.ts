@@ -4,6 +4,7 @@ import {
   type ConsistencyInput,
   checkInputConsistency,
   isExpandable,
+  operatorInputText,
   truncate,
 } from "./human-input";
 
@@ -32,6 +33,38 @@ describe("isExpandable", () => {
   it("is not expandable when the excerpt is no longer than the summary", () => {
     // e.g. feedback: summary "Feedback 👍: nice" is longer than the "nice" comment.
     expect(isExpandable("Feedback 👍: nice", "nice")).toBe(false);
+  });
+});
+
+describe("operatorInputText", () => {
+  it("drops a purely harness-injected line (bare task-notification) → empty", () => {
+    const line =
+      "<task-notification>\n<task-id>abc</task-id>\n<status>done</status>\n</task-notification>";
+    expect(operatorInputText(line)).toBe("");
+  });
+
+  it("strips a leading system-reminder and keeps the Owner's real message", () => {
+    const line =
+      "<system-reminder>\nThe background task was deleted.\n</system-reminder>\n\nKick off the next set of executions.";
+    expect(operatorInputText(line)).toBe("Kick off the next set of executions.");
+  });
+
+  it("strips several stacked injected blocks", () => {
+    const line =
+      "<system-reminder>one</system-reminder>\n<ci-monitor-event>two</ci-monitor-event>\nreal directive";
+    expect(operatorInputText(line)).toBe("real directive");
+  });
+
+  it("leaves a genuine human message untouched", () => {
+    expect(operatorInputText("  scrap light mode altogether  ")).toBe(
+      "scrap light mode altogether",
+    );
+  });
+
+  it("keeps a human message that merely quotes a tag mid-sentence", () => {
+    // Only LEADING injected blocks are stripped; a quoted tag inside prose is human input.
+    const line = "why does the log show <task-notification> entries as if I typed them?";
+    expect(operatorInputText(line)).toBe(line);
   });
 });
 

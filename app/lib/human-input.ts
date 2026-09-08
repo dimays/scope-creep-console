@@ -46,6 +46,43 @@ export function isExpandable(summary: string, excerpt?: string): boolean {
   return !!full && full.length > summary.length;
 }
 
+// Harness-injected wrapper tags: content the terminal capture hook (work-020) records
+// that the *harness* produced, not the Owner. The UserPromptSubmit hook fires on every
+// prompt and captures the whole submitted text, but the harness prepends synthetic blocks
+// to it — a `<task-notification>` when a background task finishes (usually the entire
+// "prompt", with no human text at all), a `<system-reminder>` ahead of a real message, a
+// `<ci-monitor-event>` from a watched PR. None of it is the Owner typing, so the
+// Human-Input Log (ADR-010) must not count it. This list is deliberately explicit rather
+// than "any tag" — a human message may legitimately contain angle-bracketed text — and is
+// one line to extend if a new injected wrapper appears.
+const INJECTED_TAGS = ["task-notification", "system-reminder", "ci-monitor-event"] as const;
+
+// Matches a single injected block anchored at the START of the text: `<tag …>…</tag>` with
+// any attributes, non-greedy body, case-insensitive. The `\1` backreference pins the close
+// to the same tag so an unrelated later block isn't swallowed.
+const INJECTED_LEADING_BLOCK = new RegExp(
+  `^\\s*<(${INJECTED_TAGS.join("|")})\\b[^>]*>[\\s\\S]*?<\\/\\1>\\s*`,
+  "i",
+);
+
+/**
+ * Return only what the Owner actually typed in a captured operator-session prompt, with
+ * any harness-injected wrapper blocks (see {@link INJECTED_TAGS}) stripped from the front.
+ * Injected blocks stack — e.g. a `<system-reminder>` can precede a real directive, and two
+ * reminders can precede it — so we strip leading blocks repeatedly and keep the remainder.
+ * Returns `""` when the line was purely injected (a bare `<task-notification>` with no human
+ * text); the caller drops those from the log rather than showing a non-human "input".
+ */
+export function operatorInputText(text: string): string {
+  let out = text.trim();
+  while (out.length > 0) {
+    const next = out.replace(INJECTED_LEADING_BLOCK, "").trim();
+    if (next === out) break; // no leading injected block left
+    out = next;
+  }
+  return out;
+}
+
 // --- Consistency self-checks (work-022) ----------------------------------
 // The Human-Input Log is a projection over real systems of record, so it can drift
 // from them. Two honest, threshold-free checks over the spine (work-012 / ADR-010):
