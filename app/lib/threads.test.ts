@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Thread } from "./threads";
-import { groupThreads, isArchived, needsYouThreads, parseMeta } from "./threads";
+import {
+  groupThreads,
+  isArchived,
+  isNotableUpdate,
+  NOTABLE_MESSAGE_TYPES,
+  needsYouThreads,
+  parseMeta,
+} from "./threads";
 
 // A minimal thread factory — only the fields the pure derivations read.
 function thread(over: Partial<Thread> & Pick<Thread, "id" | "status">): Thread {
@@ -98,6 +105,25 @@ describe("archive exclusion from groupings (work-049)", () => {
     expect(closed.map((t) => t.id)).toEqual([3]);
     // The three archived threads appear in no group.
     expect(needsYou.length + active.length + closed.length).toBe(3);
+  });
+});
+
+describe("notable org write-back types (work-064)", () => {
+  it("isNotableUpdate is true only for the async write-back card types", () => {
+    expect(isNotableUpdate("needs-input")).toBe(true);
+    expect(isNotableUpdate("critical-update")).toBe(true);
+    // Routine chatter and the older typed cards are not "notable" org signals.
+    expect(isNotableUpdate("message")).toBe(false);
+    expect(isNotableUpdate("outcome")).toBe(false);
+    expect(isNotableUpdate("generated-request")).toBe(false);
+    expect(isNotableUpdate("branch")).toBe(false);
+    expect(isNotableUpdate("")).toBe(false);
+  });
+
+  it("NOTABLE_MESSAGE_TYPES is the single source of truth for isNotableUpdate", () => {
+    for (const type of NOTABLE_MESSAGE_TYPES) {
+      expect(isNotableUpdate(type)).toBe(true);
+    }
   });
 });
 

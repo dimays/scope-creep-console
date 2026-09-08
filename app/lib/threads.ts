@@ -11,6 +11,36 @@ export type Thread = Conversation;
 export type ThreadMessage = ConversationMessage;
 
 /**
+ * The `conversation_messages.type` discriminator (ADR-012). A plain `message`, or one of the
+ * typed cards. `critical-update` and `needs-input` are the org's **async write-back** types
+ * (work-064): a server-side process with no launched Claude session (the [[request-triage]]
+ * routine, an agent) posts one straight into the thread. A `critical-update` is FYI — the
+ * thread stays the org's (`working`); a `needs-input` parks the thread on the Owner
+ * (`needs-you`) and is the "notable" signal the unread badge/notification center key off
+ * (work-063). Additive on the existing column — no reshape.
+ */
+export type ThreadMessageType =
+  | "message"
+  | "outcome"
+  | "generated-request"
+  | "branch"
+  | "critical-update"
+  | "needs-input";
+
+/**
+ * The org write-back types that are **notable** — worth surfacing in the notification center
+ * and driving the unread signal (work-063/064), distinct from routine chatter. `needs-input`
+ * additionally parks the thread on the Owner; `critical-update` is FYI. Keep this the single
+ * source of truth so the badge, the notification feed, and the thread cards agree.
+ */
+export const NOTABLE_MESSAGE_TYPES = ["needs-input", "critical-update"] as const;
+
+/** Whether a message type is a notable org write-back (see {@link NOTABLE_MESSAGE_TYPES}). */
+export function isNotableUpdate(type: string): boolean {
+  return (NOTABLE_MESSAGE_TYPES as readonly string[]).includes(type);
+}
+
+/**
  * Whether a thread is archived (work-049) — orthogonal to `status`. Archived threads leave
  * the main Threads UI and all its groupings; they live in the Archive view until restored.
  */

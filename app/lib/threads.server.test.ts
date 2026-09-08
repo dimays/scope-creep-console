@@ -14,6 +14,8 @@ import {
   listArchivedThreads,
   listThreads,
   orgFollowup,
+  postCriticalUpdate,
+  postNeedsInput,
   restoreThread,
   setStatus,
 } from "./threads.server";
@@ -276,6 +278,62 @@ describe("archive / restore threads (work-049)", () => {
     await restoreThread(t.id);
     expect((await listThreads()).some((x) => x.id === t.id)).toBe(true);
     expect((await listArchivedThreads()).some((x) => x.id === t.id)).toBe(false);
+  });
+});
+
+describe("org async write-back (work-064)", () => {
+  it("postCriticalUpdate posts an FYI card and keeps the thread the org's (working)", async () => {
+    const t = await createThread("Build the loop", "Please build the request loop.");
+    // Simulate a sessionless server-side process (a routine) posting a progress note.
+    await postCriticalUpdate(t.id, {
+      label: "Triaged — ticket created",
+      body: "Opened work-070 and routed it to the CTO.",
+      refUrl: "/work/070",
+      refLabel: "work-070",
+    });
+
+    const loaded = await getThread(t.id);
+    const card = loaded?.messages.at(-1);
+    expect(card?.type).toBe("critical-update");
+    expect(card?.role).toBe("agent"); // org-authored → never enters the Human-Input Log
+    expect(loaded?.thread.status).toBe("working"); // FYI: the thread stays the org's turn
+    const meta = parseMeta(card?.meta ?? null);
+    expect(meta.label).toBe("Triaged — ticket created");
+    expect(meta.author).toBe("chief-of-staff");
+    expect(meta.refUrl).toBe("/work/070");
+    expect(meta.refLabel).toBe("work-070");
+  });
+
+  it("postNeedsInput posts a question card and parks the thread on the Owner (needs-you)", async () => {
+    const t = await createThread("Scope call", "Kick this off.");
+    await setStatus(t.id, "working");
+    await postNeedsInput(t.id, {
+      label: "Need your call on scope",
+      body: "Ship the minimal cut, or the full surface? Blocks the estimate.",
+      author: "chief-product-officer",
+    });
+
+    const loaded = await getThread(t.id);
+    const card = loaded?.messages.at(-1);
+    expect(card?.type).toBe("needs-input");
+    expect(card?.role).toBe("agent");
+    expect(loaded?.thread.status).toBe("needs-you"); // parks the thread on the Owner
+    expect(parseMeta(card?.meta ?? null).author).toBe("chief-product-officer");
+  });
+
+  it("works with no launched session — an ordinary sessionless server call", async () => {
+    const t = await createThread("Sessionless", "No Claude session launched here.");
+    expect((await getThread(t.id))?.thread.launchedAt).toBeNull();
+    await postNeedsInput(t.id, { label: "A question with no session" });
+    const loaded = await getThread(t.id);
+    expect(loaded?.thread.launchedAt).toBeNull(); // still never launched
+    expect(loaded?.messages.some((m) => m.type === "needs-input")).toBe(true);
+  });
+
+  it("status can be overridden (e.g. a critical-update that closes the thread out)", async () => {
+    const t = await createThread("Override", "…");
+    await postCriticalUpdate(t.id, { label: "Done — nothing more needed", status: "closed" });
+    expect((await getThread(t.id))?.thread.status).toBe("closed");
   });
 });
 
