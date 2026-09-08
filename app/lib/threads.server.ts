@@ -305,7 +305,8 @@ export async function addGeneratedRequest(
   });
 }
 
-type OrgUpdateOpts = {
+/** Options for the async write-back cards ({@link postCriticalUpdate} / {@link postNeedsInput}). */
+export type OrgUpdateOpts = {
   /** The card headline (e.g. "Triaged — ticket created", "Need your call on scope"). */
   label: string;
   /** Optional body prose under the headline. */
