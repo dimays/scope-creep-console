@@ -33,6 +33,33 @@ export function isRemoteUrl(url: string): boolean {
   return /^(libsql|https?|wss?):\/\//.test(url);
 }
 
+/**
+ * Force the **HTTP transport** for a remote libSQL url by normalizing its scheme to
+ * `http(s)://`. The `@libsql` client picks its transport from the URL scheme:
+ * `libsql://` / `wss://` / `ws://` open a long-lived **WebSocket**, while `https://` /
+ * `http://` use **hrana-over-HTTP**.
+ *
+ * The WebSocket transport is dropped by the cloud routine's egress proxy — a run failed with
+ * `ws_closed_mid_exchange` (the proxy closes the long-lived socket mid-exchange) while HTTP to
+ * the same host succeeded (`curl …/v2/pipeline` → 200, `createClient({ url: "https://…" })`
+ * ran `SELECT 1` OK). HTTP is functionally equivalent for our access and works everywhere —
+ * locally and behind the proxy — so we normalize remote urls to the HTTP transport. This lets
+ * the environment keep the `libsql://` URL Turso hands out; no env-var change is needed.
+ * See ADR-024 / work-065.
+ *
+ *   libsql:// → https://   ·   wss:// → https://   ·   ws:// → http://
+ *   https:// / http:// pass through unchanged.
+ *
+ * `file:` (local) and any non-remote url are returned untouched. Intended to run on a url
+ * already classified remote by {@link isRemoteUrl}.
+ */
+export function toHttpTransportUrl(url: string): string {
+  const scheme = /^(libsql|wss|ws|https?):\/\//.exec(url)?.[1];
+  if (!scheme) return url; // not a remote scheme (e.g. file:, :memory:) — leave untouched
+  const httpScheme = scheme === "ws" || scheme === "http" ? "http" : "https";
+  return url.replace(/^[a-z]+:\/\//, `${httpScheme}://`);
+}
+
 /** The resolved libSQL client config plus whether it targets a remote endpoint. */
 export type DbConfig = {
   url: string;
@@ -63,5 +90,8 @@ export function resolveDbConfig(
     );
   }
 
-  return remote ? { url, authToken, remote } : { url, remote };
+  // Remote: normalize to the HTTP transport so we work behind the cloud routine's egress
+  // proxy, which drops the WebSocket transport that `libsql://`/`wss://` would select
+  // (`ws_closed_mid_exchange`). See toHttpTransportUrl / ADR-024 / work-065.
+  return remote ? { url: toHttpTransportUrl(url), authToken, remote } : { url, remote };
 }
