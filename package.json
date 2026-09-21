@@ -20,7 +20,8 @@
     "destroy": "echo 'GATED (INVARIANTS §III): run `fly apps destroy scope-creep-console` yourself.' && exit 1",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "triage": "tsx scripts/triage.ts"
+    "triage": "tsx scripts/triage.ts",
+    "work-sweep": "tsx scripts/work-sweep.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
