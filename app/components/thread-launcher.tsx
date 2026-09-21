@@ -109,10 +109,17 @@ export function ResumePanel({
   schemeRegistered: boolean;
   homeResolved: boolean;
 }) {
-  // Fire the seeded deep link exactly once, right after launch — only when the handler scheme
-  // is registered AND we have a real launch URL (a resolved home). Otherwise navigating there
-  // just errors. Guarded per-thread so a reload or a return visit never re-launches.
-  const canAutoLaunch = schemeRegistered && homeResolved && deepLink !== null;
+  // Correlated = the thread is linked to a live session (resume-by-uuid is known). Declared
+  // before the auto-launch effect because the gate below depends on it.
+  const correlated = resumeCommand !== null;
+  // Fire the seeded deep link exactly once, right after launch — only for a launched but
+  // NOT-yet-correlated thread, when the handler scheme is registered AND we have a real launch
+  // URL (a resolved home). The `!correlated` gate is load-bearing: this is a hook, so it runs
+  // regardless of which render branch shows. Without it, revisiting an already-correlated
+  // thread in a fresh tab (whose per-thread sessionStorage guard is empty) would navigate to
+  // the seeded deepLink and open a NEW session — resurrecting work-102 and corrupting resume
+  // (Step 3 must reopen the SAME session). Enter-gated either way, so ADR-016 holds.
+  const canAutoLaunch = schemeRegistered && homeResolved && deepLink !== null && !correlated;
   const firedRef = useRef(false);
   useEffect(() => {
     if (firedRef.current || !canAutoLaunch || deepLink === null) return;
@@ -138,7 +145,7 @@ export function ResumePanel({
   //   auto-launch → the seeded session is opening; a single manual "Open" is the fallback
   //   copy        → the URL handler isn't registered yet; the copyable command is the one action
   //   config      → no resolved home, so no honest command exists — prompt for SCOPE_CREEP_HOME
-  const correlated = resumeCommand !== null;
+  // (`correlated` is computed above, ahead of the auto-launch effect that also depends on it.)
 
   return (
     <section className="launcher launcher--resume" aria-label="Your Claude Code session">
