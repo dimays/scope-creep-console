@@ -14,6 +14,7 @@ import {
   agentDisplayName,
   threadReferences,
 } from "~/lib/explore.server";
+import { projectionHasTurns, shouldRenderWhenLaunched } from "~/lib/thread-view";
 import {
   parseMeta,
   type ThreadInitiator,
@@ -151,7 +152,15 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
   const nav = useNavigation();
   const launching = nav.state !== "idle" && nav.formData?.get("intent") === "launch";
   const launched = projection.status !== "not-launched";
-  const seed = messages.find((m) => m.role === "owner" && m.type === "message")?.body ?? "";
+  // The Owner's seed: the first plain Owner message. Its body seeds the launcher composer;
+  // its id lets the timeline keep the original ask visible when launched (work-089).
+  const seedMessage = messages.find((m) => m.role === "owner" && m.type === "message");
+  const seed = seedMessage?.body ?? "";
+  const seedMessageId = seedMessage?.id;
+  // A launched thread's conversation lives in the projected transcript (ADR-016), but a
+  // cloud-launched thread has no local JSONL, so the projection can be empty. Track whether
+  // it's actually showing turns to decide if the seed still needs a fallback render (work-089).
+  const projHasTurns = projectionHasTurns(projection);
 
   // Bug-2 fix (ADR-013 decision-2): short-poll revalidation so a launched thread's projected
   // transcript, turn count, and status refresh on their own while the Claude Code session
@@ -221,9 +230,16 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           if (msg.type === "branch") return <BranchCard key={msg.id} msg={msg} />;
           if (msg.type === "critical-update") return <CriticalUpdateCard key={msg.id} msg={msg} />;
           if (msg.type === "needs-input") return <NeedsInputCard key={msg.id} msg={msg} />;
-          // Once launched, plain messages are shown by the projected transcript below —
-          // render only the typed cards here so the opener isn't duplicated.
-          if (launched) return null;
+          // Once launched, the projected transcript below owns the conversation, so plain
+          // messages are hidden here to avoid duplication (work-047, ADR-016). EXCEPT the
+          // Owner's seed: a cloud-launched thread has no local JSONL, so the projection is
+          // empty and the original ask would render NOWHERE — keep it visible whenever the
+          // transcript has no turns to show it (work-089). See app/lib/thread-view.ts.
+          if (
+            launched &&
+            !shouldRenderWhenLaunched(msg, { seedMessageId, projectionHasTurns: projHasTurns })
+          )
+            return null;
           return (
             <div key={msg.id} className={`msg msg--${msg.role === "owner" ? "owner" : "agent"}`}>
               <span className="msg__author">{authorLabel(msg)}</span>
