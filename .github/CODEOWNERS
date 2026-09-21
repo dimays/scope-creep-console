@@ -1,0 +1,7 @@
+# Independent review authority = the machine account @scope-creep-review.
+# A Write (non-admin) GitHub USER, so it CAN be a code owner and satisfy
+# require_code_owner_reviews. It approves others' PRs; GitHub blocks it from
+# approving its own, so author != merger holds mechanically. The human Owner
+# (@dimays) is reserved for ESCALATION (the owner-approved label), not routine
+# review. (ADR-023 Phase 1; docs/owner-apply-reviewer-identity.md)
+* @scope-creep-review
