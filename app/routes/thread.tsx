@@ -286,11 +286,10 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           <ResumePanel
             threadId={thread.id}
             deepLink={projection.deepLink}
-            openRepoLink={projection.openRepoLink}
             cliCommand={projection.cliCommand}
             resumeCommand={projection.resumeCommand}
             schemeRegistered={projection.schemeRegistered}
-            matched={projection.status === "matched"}
+            homeResolved={projection.homeResolved}
           />
         </>
       ) : (

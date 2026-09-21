@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
+import { statSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   buildCliCommand,
@@ -35,9 +36,45 @@ export type {
  * resolved path on the thread so we never rescan.
  */
 
-/** The control-plane repo — the `cwd` a launched Claude Code session opens in. */
+/**
+ * Resolve the control-plane repo — the `cwd` a launched Claude Code session opens in — to an
+ * **absolute, real directory**, or `null` when it can't be resolved (work-099). This is the
+ * only value allowed to feed a launch URL: a deep link must never carry a bogus, relative, or
+ * empty `cwd`, so an unresolved home degrades the UI to the honest needs-you/config state.
+ *
+ * Resolution: prefer `SCOPE_CREEP_HOME`; else the historical sibling default
+ * (`<cwd>/../scope-creep`). Either way we `resolve()` to an absolute path (collapsing any `..`,
+ * which the deep-link handler also rejects) and confirm it is a real directory on disk. The
+ * old `SCOPE_CREEP_HOME ?? join(cwd,"..","scope-creep")` was unsound: in dev `.env` isn't
+ * loaded so the env var is inert and the path was correct only by the coincidence that the
+ * console sits beside the control plane, and on a deployed Linux console (cwd `/app`) the
+ * fallback yields a bogus `/scope-creep`. We fail honestly instead of emitting that.
+ */
+export function resolveControlPlaneHome(): string | null {
+  const raw = process.env.SCOPE_CREEP_HOME?.trim();
+  const candidate = raw && raw.length > 0 ? raw : join(process.cwd(), "..", "scope-creep");
+  const abs = resolve(candidate);
+  if (!isAbsolute(abs)) return null;
+  try {
+    if (statSync(abs).isDirectory()) return abs;
+  } catch {
+    // Not on disk (deployed console without the control plane mounted, or a wrong path).
+  }
+  return null;
+}
+
+/**
+ * A string accessor kept for the correlation scan, which uses `cwd` only as the *preferred*
+ * project dir to check first and tolerates a wrong value (it scans every project dir anyway).
+ * Falls back to the raw sibling path when the home can't be resolved to a real dir. **Never
+ * used to build a launch URL** — those go through `resolveControlPlaneHome()` (null → honest
+ * fallback), so a bogus path here can only misorder a scan, never mislead the Owner.
+ */
 export function controlPlaneHome(): string {
-  return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
+  return (
+    resolveControlPlaneHome() ??
+    (process.env.SCOPE_CREEP_HOME?.trim() || join(process.cwd(), "..", "scope-creep"))
+  );
 }
 
 /** Root of Claude Code's per-project session store (overridable for tests). */
@@ -50,21 +87,24 @@ function claudeProjectsRoot(): string {
 let schemeCache: boolean | undefined;
 
 /**
- * Is the `claude:` (Claude Desktop) URL scheme registered with the OS? (work-046 live-check.)
- * This is the scheme that hosts Claude Code on the Owner's machine — Claude Code runs embedded
- * in Claude Desktop, so `claude-cli:` (a standalone-binary scheme) is *not* registered here,
- * but `claude:` is. We use a **side-effect-free** LaunchServices query
- * (`lsregister -dump`, matched for a registered `claude:` scheme) rather than `open`, because
- * `open` would *launch* the app on a hit. The pattern `claude:` matches the Desktop scheme
- * without matching `claude-cli:` (whose next char is `-`, not `:`). macOS only; anything else
- * (or any failure) is reported as "not registered" so the UI shows the honest fallback (the
- * copyable command) instead of claiming a launch it can't guarantee. Cached for the process —
- * registration doesn't change mid-run.
+ * Is Claude Code's official `claude-cli://` URL handler registered with the OS? (work-098
+ * live-check, corrected.) This is the scheme the launch link actually uses — Claude Code
+ * installs a `~/Applications/Claude Code URL Handler.app` claiming `claude-cli:` the first time
+ * you send a prompt in an interactive session (per the deep-links doc). We use a
+ * **side-effect-free** LaunchServices query (`lsregister -dump`, matched for a registered
+ * `claude-cli:` scheme) rather than `open`, because `open` would *launch* the app on a hit —
+ * and, worse, `open`'s exit 0 is not proof of anything: the bare `claude:` scheme is claimed by
+ * the Claude apps regardless, so probing `claude:` (as this did before work-098) returned true
+ * even though a `claude://code/new?…&folder=` click dropped the Owner in "No folder." We probe
+ * the exact scheme the link uses. macOS only; anything else (or any failure) is reported as
+ * "not registered" so the UI shows the honest fallback (the copyable command) instead of
+ * claiming a launch it can't guarantee. Cached for the process — registration doesn't change
+ * mid-run.
  *
- * `SC_CLAUDE_CLI_SCHEME=1|0` overrides the probe (name kept for continuity). This matters for a
- * **deployed** (Linux) Console: the server runs on a different host than the Owner's Mac and
- * can't probe it, so the Owner can declare "the scheme works in my browser" (`=1`) or force the
- * copyable fallback (`=0`). It also keeps tests deterministic and fast.
+ * `SC_CLAUDE_CLI_SCHEME=1|0` overrides the probe. This matters for a **deployed** (Linux)
+ * Console: the server runs on a different host than the Owner's Mac and can't probe it, so the
+ * Owner can declare "the handler is registered on my machine" (`=1`) or force the copyable
+ * fallback (`=0`). It also keeps tests deterministic and fast.
  */
 export async function verifyClaudeCliScheme(): Promise<boolean> {
   if (schemeCache !== undefined) return schemeCache;
@@ -81,10 +121,10 @@ export async function verifyClaudeCliScheme(): Promise<boolean> {
     "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister";
   try {
     const { stdout } = await exec(lsregister, ["-dump"], { maxBuffer: 64 * 1024 * 1024 });
-    // `claude:` = Claude Desktop's scheme; the negative lookahead rejects `claude-cli:`
-    // and `claudecode:`-style neighbors (verified against the live lsregister dump, where
-    // it appears as a bare `claude:` and as `claude:,` in a scheme list).
-    schemeCache = /claude:(?![-\w])/.test(stdout);
+    // The official launcher scheme, exactly as lsregister prints it in a `claimed schemes:`
+    // or `bindings:` line (e.g. `claude-cli:` or `claude-cli:,`). Distinct from the bare
+    // `claude:` scheme, which is always claimed and is NOT the deep-link handler.
+    schemeCache = /claude-cli:/.test(stdout);
   } catch {
     schemeCache = false;
   }
@@ -168,11 +208,17 @@ export type ThreadProjection = {
   sessionPath?: string;
   /** True when we just resolved the correlation this call — the caller persists it. */
   newlyResolved: boolean;
-  /** Launch affordances (built from local data; no Claude call). */
-  cwd: string;
-  deepLink: string;
-  cliCommand: string;
-  openRepoLink: string;
+  /**
+   * Launch affordances (built from local data; no Claude call). All are `null` when the
+   * control-plane home can't be resolved to a real absolute dir (`homeResolved: false`) — we
+   * never emit a bogus/relative/empty `cwd`; the UI shows the needs-you/config state instead.
+   */
+  cwd: string | null;
+  /** False → the control-plane path is unknown; render the "set SCOPE_CREEP_HOME" state. */
+  homeResolved: boolean;
+  deepLink: string | null;
+  cliCommand: string | null;
+  openRepoLink: string | null;
   resumeCommand: string | null;
   schemeRegistered: boolean;
 };
@@ -197,15 +243,20 @@ type ThreadLike = {
 export async function resolveThreadProjection(
   thread: ThreadLike,
   seedText: string,
-  cwd = controlPlaneHome(),
+  cwd: string | null = resolveControlPlaneHome(),
 ): Promise<ThreadProjection> {
   const schemeRegistered = await verifyClaudeCliScheme();
   const seedPrompt = buildSeedPrompt(thread.id, seedText);
+  // Only a resolved, real, absolute home may feed a launch URL — otherwise every launch
+  // affordance is null and the UI degrades to the honest "set SCOPE_CREEP_HOME" state rather
+  // than emitting a bogus `cwd` into a link the Owner would click (work-099).
+  const homeResolved = cwd !== null;
   const base = {
     cwd,
-    deepLink: buildDeepLink({ cwd, prompt: seedPrompt }),
-    cliCommand: buildCliCommand({ cwd, prompt: seedPrompt }),
-    openRepoLink: buildOpenRepoLink(cwd),
+    homeResolved,
+    deepLink: cwd !== null ? buildDeepLink({ cwd, prompt: seedPrompt }) : null,
+    cliCommand: cwd !== null ? buildCliCommand({ cwd, prompt: seedPrompt }) : null,
+    openRepoLink: cwd !== null ? buildOpenRepoLink(cwd) : null,
     schemeRegistered,
     newlyResolved: false,
   };
@@ -226,8 +277,10 @@ export async function resolveThreadProjection(
     };
   }
 
-  // Launched but not yet linked — attempt correlation now.
-  const match = await findSessionForThread(thread.id, cwd);
+  // Launched but not yet linked — attempt correlation now. The scan uses cwd only as the
+  // preferred dir and tolerates a null home (it falls back to controlPlaneHome() and scans
+  // every project dir), so correlation still works even when no launch URL can be built.
+  const match = await findSessionForThread(thread.id, cwd ?? undefined);
   if (!match) {
     return { ...base, status: "pending", turns: [], resumeCommand: null };
   }
