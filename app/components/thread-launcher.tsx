@@ -1,15 +1,18 @@
+import { WorkingIndicator } from "@scope-creep/design";
 import { useEffect, useRef, useState } from "react";
 import { Form } from "react-router";
 import { SubmitButton } from "~/components/state";
 
 /**
- * The Threads launcher UI (work-046, ADR-016). Two modes:
+ * The Threads launcher UI (work-101/work-102, ADR-016). Two modes:
  *  - `ThreadLauncher` (not launched): the compose form whose Submit opens a NEW Claude Code
  *    session seeded with the typed message. The in-app input lives here and *only* here.
- *  - `ResumePanel` (launched): the in-app input is gone; this fires the `claude-cli://` deep
- *    link once, then shows a "Resume in Claude" slot — honest about whether the handler scheme
- *    is registered and whether the control-plane home resolved. The resume slot only ever shows
- *    the correlated `claude --resume <uuid>` command; it NEVER opens a new session (work-100).
+ *  - `ResumePanel` (launched): the in-app input is gone. This is a single, state-driven panel
+ *    that shows exactly ONE primary way into the session for the current reality — resume the
+ *    correlated session, open the seeded one (auto-fired once), copy the launch command when the
+ *    URL handler isn't registered yet, or an honest config prompt when the control-plane home
+ *    can't be resolved. "Resume" wording is reserved for the correlated `claude --resume <uuid>`
+ *    state; nothing here ever labels a start-new control "Resume" (work-102).
  *
  * Nothing here calls Claude. Opening is an OS URL-scheme launch (or a copied shell command);
  * resuming is a copyable CLI command; the transcript is projected from local session data by
@@ -54,9 +57,38 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     }
   }
   return (
-    <button type="button" className="launcher__copy" onClick={copy}>
+    <button
+      type="button"
+      className="launcher__copy"
+      data-copied={copied ? "" : undefined}
+      onClick={copy}
+    >
       {copied ? "Copied" : label}
     </button>
+  );
+}
+
+/** A copyable shell command: the monospace command + its copy affordance, one consistent row. */
+function CommandRow({ command, copyLabel }: { command: string; copyLabel: string }) {
+  return (
+    <div className="launcher__cmdrow">
+      <code className="launcher__cmd">{command}</code>
+      <CopyButton text={command} label={copyLabel} />
+    </div>
+  );
+}
+
+/**
+ * A single subtle line, shown only before the session links up, explaining the one thing that
+ * happens next: correlation. Stated ONCE here — the transcript's empty state speaks only to its
+ * own turns, so the "waiting" fact is never restated in two boxes (work-104).
+ */
+function LinkingAside() {
+  return (
+    <p className="launcher__aside">
+      This thread links to its session automatically once the first message lands — the{" "}
+      <code>claude --resume</code> command appears here then.
+    </p>
   );
 }
 
@@ -100,58 +132,57 @@ export function ResumePanel({
     window.location.href = deepLink;
   }, [threadId, deepLink, canAutoLaunch]);
 
+  // ONE panel, ONE primary affordance per state. The states are mutually exclusive and ordered
+  // by what the Owner can actually do right now:
+  //   correlated  → Resume the live session (the only true "Resume" — reserved wording, work-102)
+  //   auto-launch → the seeded session is opening; a single manual "Open" is the fallback
+  //   copy        → the URL handler isn't registered yet; the copyable command is the one action
+  //   config      → no resolved home, so no honest command exists — prompt for SCOPE_CREEP_HOME
+  const correlated = resumeCommand !== null;
+
   return (
-    <section className="launcher launcher--resume">
+    <section className="launcher launcher--resume" aria-label="Your Claude Code session">
+      <span className="launcher__label">Your session</span>
+
       {!homeResolved ? (
-        // Honest config state: no bogus cwd is ever emitted into a launch command (work-099).
-        <p className="console__notice launcher__notice">
+        // Honest config state: no bogus cwd is ever emitted into a launch command (work-101).
+        <p className="launcher__notice">
           The control-plane repo isn't resolved, so the Console can't build a launch command. Set{" "}
           <code>SCOPE_CREEP_HOME</code> to your control-plane path and reload.
         </p>
+      ) : correlated ? (
+        <div className="launcher__body">
+          <p className="launcher__lead">This thread is linked to its Claude Code session.</p>
+          {/* The correlated resume — target the session directly by UUID. Resume-by-uuid is
+              CLI-only (no deep link exists), and this is the ONLY resume affordance; it never
+              opens a new session (work-102). */}
+          <CommandRow command={resumeCommand} copyLabel="Copy resume command" />
+        </div>
       ) : canAutoLaunch ? (
-        <p className="launcher__hint">
-          Opening this thread in Claude Code… If nothing happened,{" "}
-          <a className="launcher__open" href={deepLink ?? undefined}>
-            open the seeded session
-          </a>
-          .
-        </p>
+        <div className="launcher__body">
+          <p className="launcher__lead">
+            <WorkingIndicator className="launcher__spinner" label="Opening in Claude Code" />
+            <span>
+              Opening this thread in Claude Code… If nothing happened,{" "}
+              <a className="launcher__open" href={deepLink ?? undefined}>
+                open it manually
+              </a>
+              .
+            </span>
+          </p>
+          <LinkingAside />
+        </div>
       ) : (
-        <>
-          <p className="console__notice launcher__notice">
-            Claude Code's <code>claude-cli://</code> URL handler isn't registered on this machine,
-            so the Console can't auto-launch it. Run this command to start the seeded session:
+        <div className="launcher__body">
+          <p className="launcher__lead">
+            Claude Code's <code>claude-cli://</code> URL handler isn't registered on this machine
+            yet — it installs the first time you start an interactive Claude session. Until then,
+            run this to open the seeded session:
           </p>
-          {cliCommand ? (
-            <div className="launcher__cmdrow">
-              <code className="launcher__cmd">{cliCommand}</code>
-              <CopyButton text={cliCommand} label="Copy command" />
-            </div>
-          ) : null}
-        </>
+          {cliCommand ? <CommandRow command={cliCommand} copyLabel="Copy command" /> : null}
+          <LinkingAside />
+        </div>
       )}
-
-      <div className="launcher__resume">
-        <span className="launcher__resume-label">Resume in Claude</span>
-        {resumeCommand ? (
-          // Precise resume: the session is correlated, so target it directly by UUID. This is
-          // the ONLY resume affordance — resume-by-uuid is CLI-only (no deep link exists).
-          <div className="launcher__cmdrow">
-            <code className="launcher__cmd">{resumeCommand}</code>
-            <CopyButton text={resumeCommand} label="Copy resume command" />
-          </div>
-        ) : (
-          // Uncorrelated: the honest "waiting to link" state. A resume affordance must NEVER
-          // open a new session (work-100) — the launch above already opened the seeded one, so
-          // this slot offers no new-session control, only the promise that the exact
-          // `claude --resume <uuid>` appears here once the session's first message lands.
-          <p className="launcher__hint launcher__resume-pending">
-            Waiting to link this thread to its Claude Code session — the exact{" "}
-            <code>claude --resume &lt;uuid&gt;</code> command appears here automatically once the
-            session's first message lands.
-          </p>
-        )}
-      </div>
     </section>
   );
 }

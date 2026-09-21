@@ -743,6 +743,17 @@ a.console__item-name:hover {
   white-space: pre-wrap;
 }
 
+/* The seed opener: the Owner's opening ask leading the transcript when no turns carry it yet
+   (work-089/work-104). An owner bubble in the transcript's own rhythm, marked by a quiet accent
+   edge + caption so it reads as the start of the conversation, never as a live turn. */
+.msg--opener {
+  border-left: 2px solid var(--sc-accent);
+}
+.msg__caption {
+  color: var(--sc-accent);
+  letter-spacing: 0.04em;
+}
+
 /* thread lifecycle/turn (work-029, ADR-012): needs-you | working | closed | open */
 .thread-status--needs-you {
   background: color-mix(in srgb, var(--sc-warn) 18%, transparent);
@@ -1663,9 +1674,11 @@ a.console__item-name:hover {
   color: var(--sc-text);
 }
 
-/* Threads launcher + projected transcript (work-046 / work-047, ADR-016).
+/* Threads launcher + projected transcript (work-101 / work-102, ADR-016).
    The launcher replaces the old in-app chat runtime: the conversation lives in a Claude
-   Code session; this surface opens it, resumes it, and projects its transcript. */
+   Code session; this surface opens it, resumes it, and projects its transcript. The launched
+   panel shows ONE primary affordance per state and shares the transcript's rhythm and tokens
+   — one design language, not two abutting ones (work-104). */
 .launcher {
   margin-top: 1.25rem;
 }
@@ -1675,21 +1688,79 @@ a.console__item-name:hover {
   font-size: 0.9rem;
   line-height: 1.5;
 }
-.launcher__notice {
-  border-left-color: var(--sc-attention);
-}
+
+/* The launched-state panel: a quiet raised card with a labeled header that echoes the
+   doc-group titles above it. A subtle rise on mount — delight in the 200ms nobody budgets
+   for — riding the shared motion tokens, so it collapses to nothing under reduced motion. */
 .launcher--resume {
+  margin-top: 1.5rem;
   background: var(--sc-surface);
   border: 1px solid var(--sc-border);
   border-radius: var(--sc-radius);
   padding: 1.1rem 1.25rem;
+  animation: launcher-rise var(--sc-motion) var(--sc-ease);
+}
+@keyframes launcher-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.launcher__label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sc-muted);
+}
+.launcher__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.launcher__lead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0;
+  color: var(--sc-text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.launcher__spinner {
+  flex: none;
+  transform: translateY(2px);
+}
+.launcher__aside {
+  margin: 0;
+  color: var(--sc-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+/* Honest config prompt: attention accent, no fabricated action. Self-contained (no longer
+   layered on .console__notice) so the panel owns its one look. */
+.launcher__notice {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  background: var(--sc-bg);
+  border: 1px solid var(--sc-border);
+  border-left: 3px solid var(--sc-attention);
+  border-radius: var(--sc-radius);
+  color: var(--sc-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 .launcher__cmdrow {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
-  margin: 0.4rem 0 0.9rem;
+  margin: 0;
 }
 .launcher__cmd {
   flex: 1 1 20rem;
@@ -1713,28 +1784,25 @@ a.console__item-name:hover {
   border-radius: var(--sc-radius);
   padding: 0.5rem 0.85rem;
   font-size: 0.82rem;
+  transition:
+    border-color var(--sc-motion) var(--sc-ease),
+    color var(--sc-motion) var(--sc-ease);
 }
 .launcher__copy:hover {
   border-color: var(--sc-accent);
 }
+/* Copied confirmation: a quiet flip to the success token — the affordance acknowledges itself. */
+.launcher__copy[data-copied] {
+  border-color: var(--sc-success);
+  color: var(--sc-success);
+}
 .launcher__open {
-  display: inline-block;
   color: var(--sc-accent);
   font-weight: 600;
   text-decoration: none;
 }
 .launcher__open:hover {
   text-decoration: underline;
-}
-.launcher__resume {
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
-  border-top: 1px dashed var(--sc-border);
-}
-.launcher__resume-label {
-  display: block;
-  font-weight: 700;
-  margin-bottom: 0.35rem;
 }
 
 .thread-transcript {
@@ -1744,6 +1812,16 @@ a.console__item-name:hover {
   margin: -0.35rem 0 0.75rem;
   color: var(--sc-muted);
   font-size: 0.82rem;
+}
+/* Transcript empty-while-pending: a breathing indicator + a terse line about turns only. The
+   "how the thread links up" fact lives once, in the launcher aside — never restated here. */
+.thread-transcript__waiting {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+.thread-transcript__waiting .launcher__spinner {
+  flex: none;
 }
 .transcript__tool {
   display: flex;
