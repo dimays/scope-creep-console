@@ -1,0 +1,4 @@
+# Every change requires review from the Owner (code owner). The cloud routine acts as
+# scope-creep-routine[bot] (a GitHub App), which cannot be a code owner or approve as one —
+# it can only PROPOSE. The Owner disposes. (ADR-022 / ADR-023)
+* @dimays
