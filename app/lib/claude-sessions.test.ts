@@ -51,15 +51,23 @@ describe("thread ↔ session correlation markers (work-046)", () => {
   });
 });
 
-describe("launch URLs + fallback command (work-046)", () => {
-  it("buildDeepLink opens a new Claude Code session with folder + prompt, both encoded", () => {
+describe("launch URLs + fallback command (work-046, scheme corrected work-098)", () => {
+  it("buildDeepLink emits the documented claude-cli://open?cwd=…&q=… form, both encoded", () => {
     const url = buildDeepLink({ cwd: "/Users/x/code/scope-creep", prompt: "hi there & bye" });
-    // Claude Desktop scheme (the one actually registered), new-session route.
-    expect(url.startsWith("claude://code/new?q=")).toBe(true);
-    expect(url).toContain(`folder=${encodeURIComponent("/Users/x/code/scope-creep")}`);
+    // Official Claude Code deep-link handler: `claude-cli://open`, params `cwd` + `q`.
+    expect(url.startsWith("claude-cli://open?cwd=")).toBe(true);
+    expect(url).toContain(`cwd=${encodeURIComponent("/Users/x/code/scope-creep")}`);
     expect(url).toContain(`q=${encodeURIComponent("hi there & bye")}`);
+    // The retired form is gone: no `code/new` path, no `folder` param.
+    expect(url).not.toContain("code/new");
+    expect(url).not.toContain("folder=");
     // No raw ampersand from the prompt leaking a spurious query param.
-    expect(url.split("&").length).toBe(2); // exactly q=… & folder=…
+    expect(url.split("&").length).toBe(2); // exactly cwd=… & q=…
+    // Parses cleanly with the WHATWG URL parser (host = "open").
+    const parsed = new URL(url);
+    expect(parsed.protocol).toBe("claude-cli:");
+    expect(parsed.host).toBe("open");
+    expect(parsed.searchParams.get("cwd")).toBe("/Users/x/code/scope-creep");
   });
 
   it("buildDeepLink preserves the thread marker inside q (work-047 correlation)", () => {
@@ -71,10 +79,11 @@ describe("launch URLs + fallback command (work-046)", () => {
     expect(q).toContain(threadMarker(7));
   });
 
-  it("buildOpenRepoLink opens a new session in the folder with no seed", () => {
+  it("buildOpenRepoLink opens a new session in cwd with no seed (never a resume)", () => {
     const url = buildOpenRepoLink("/Users/x/code/scope-creep");
-    expect(url).toBe(`claude://code/new?folder=${encodeURIComponent("/Users/x/code/scope-creep")}`);
+    expect(url).toBe(`claude-cli://open?cwd=${encodeURIComponent("/Users/x/code/scope-creep")}`);
     expect(url).not.toContain("q=");
+    expect(url).not.toContain("folder=");
   });
 
   it("buildCliCommand escapes quotes so it is paste-safe", () => {

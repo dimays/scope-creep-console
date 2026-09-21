@@ -124,7 +124,10 @@ describe("route: /threads/:id branching (work-032)", () => {
     const data = await threadLoader({ params: { id: String(id) } } as never);
     expect(data.thread.launchedAt).toBeTruthy();
     expect(data.projection.status === "pending" || data.projection.status === "matched").toBe(true);
-    expect(data.projection.deepLink).toContain("claude://code/new?q=");
+    // Corrected launcher scheme (work-098): claude-cli://open?cwd=…&q=…, not the retired
+    // claude://code/new?…&folder=… form.
+    expect(data.projection.deepLink).toContain("claude-cli://open?cwd=");
+    expect(data.projection.deepLink).not.toContain("code/new");
     expect(data.projection.status).toBe("pending"); // empty projects dir → nothing correlated
 
     if (prev === undefined) delete process.env.CLAUDE_PROJECTS_DIR;
