@@ -109,6 +109,12 @@ describe("route: /threads/:id branching (work-032)", () => {
     // Point session correlation at an empty temp dir — never the Owner's real ~/.claude.
     const prev = process.env.CLAUDE_PROJECTS_DIR;
     process.env.CLAUDE_PROJECTS_DIR = mkdtempSync(join(tmpdir(), "sc-route-projects-"));
+    // Hermetic control-plane home: point SCOPE_CREEP_HOME at a real temp dir so
+    // resolveControlPlaneHome() resolves and deepLink is non-null. Without this the test would
+    // depend on a coincidental sibling `../scope-creep` — which the CI runner does not have, so
+    // deepLink would be the honest null (work-099) and the assertion below could not run.
+    const prevHome = process.env.SCOPE_CREEP_HOME;
+    process.env.SCOPE_CREEP_HOME = mkdtempSync(join(tmpdir(), "sc-route-home-"));
     const id = await openThread("Launch flow", "Give me a State of the Product.");
     const form = new FormData();
     form.set("intent", "launch");
@@ -124,11 +130,17 @@ describe("route: /threads/:id branching (work-032)", () => {
     const data = await threadLoader({ params: { id: String(id) } } as never);
     expect(data.thread.launchedAt).toBeTruthy();
     expect(data.projection.status === "pending" || data.projection.status === "matched").toBe(true);
-    expect(data.projection.deepLink).toContain("claude://code/new?q=");
+    // Corrected launcher scheme (work-098): claude-cli://open?cwd=…&q=…, not the retired
+    // claude://code/new?…&folder=… form.
+    expect(data.projection.deepLink).toContain("claude-cli://open?cwd=");
+    expect(data.projection.deepLink).not.toContain("code/new");
+    expect(data.projection.homeResolved).toBe(true); // hermetic SCOPE_CREEP_HOME above
     expect(data.projection.status).toBe("pending"); // empty projects dir → nothing correlated
 
     if (prev === undefined) delete process.env.CLAUDE_PROJECTS_DIR;
     else process.env.CLAUDE_PROJECTS_DIR = prev;
+    if (prevHome === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prevHome;
   });
 });
 

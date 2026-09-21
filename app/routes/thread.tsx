@@ -1,4 +1,4 @@
-import { ActivityRow } from "@scope-creep/design";
+import { ActivityRow, WorkingIndicator } from "@scope-creep/design";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, redirect, useNavigation, useRevalidator } from "react-router";
@@ -161,6 +161,16 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
   // cloud-launched thread has no local JSONL, so the projection can be empty. Track whether
   // it's actually showing turns to decide if the seed still needs a fallback render (work-089).
   const projHasTurns = projectionHasTurns(projection);
+  // The seed renders exactly once. Not launched → it's an ordinary timeline bubble below. Once
+  // launched, the transcript owns the conversation, so plain messages are suppressed there — but
+  // the seed leads the transcript as the "opening ask" whenever the transcript has no turns to
+  // carry it (a cloud launch with empty JSONL, work-089). When the transcript DOES have turns,
+  // its first turn already is the opener, so we show nothing extra: no double-render, and the
+  // whole decision is this one boolean instead of a per-message coupling (work-104).
+  const showSeedOpener =
+    launched &&
+    seedMessage != null &&
+    shouldRenderWhenLaunched(seedMessage, { seedMessageId, projectionHasTurns: projHasTurns });
 
   // Bug-2 fix (ADR-013 decision-2): short-poll revalidation so a launched thread's projected
   // transcript, turn count, and status refresh on their own while the Claude Code session
@@ -231,15 +241,11 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           if (msg.type === "critical-update") return <CriticalUpdateCard key={msg.id} msg={msg} />;
           if (msg.type === "needs-input") return <NeedsInputCard key={msg.id} msg={msg} />;
           // Once launched, the projected transcript below owns the conversation, so plain
-          // messages are hidden here to avoid duplication (work-047, ADR-016). EXCEPT the
-          // Owner's seed: a cloud-launched thread has no local JSONL, so the projection is
-          // empty and the original ask would render NOWHERE — keep it visible whenever the
-          // transcript has no turns to show it (work-089). See app/lib/thread-view.ts.
-          if (
-            launched &&
-            !shouldRenderWhenLaunched(msg, { seedMessageId, projectionHasTurns: projHasTurns })
-          )
-            return null;
+          // messages are hidden here to avoid duplication (work-047, ADR-016). The Owner's seed
+          // is the one exception, but it no longer renders inline — it leads the transcript as
+          // the "opening ask" (see `showSeedOpener` + <SeedOpener> below), so the timeline simply
+          // drops every plain message when launched. One home for the seed, no per-row coupling.
+          if (launched) return null;
           return (
             <div key={msg.id} className={`msg msg--${msg.role === "owner" ? "owner" : "agent"}`}>
               <span className="msg__author">{authorLabel(msg)}</span>
@@ -263,6 +269,9 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
             <p className="thread-transcript__src">
               Projected from the local Claude Code session — no Claude call.
             </p>
+            {/* The Owner's opening ask leads the transcript whenever the projection has no turns
+                to carry it (work-089/work-104). Rendered once, in the transcript's own rhythm. */}
+            {showSeedOpener ? <SeedOpener text={seed} /> : null}
             {projection.status === "matched" ? (
               projection.turns.length > 0 ? (
                 <>
@@ -271,14 +280,15 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
                   <div ref={endRef} aria-hidden="true" />
                 </>
               ) : (
-                <p className="console__empty">
-                  The session exists but has no turns yet. Empty is empty.
-                </p>
+                <p className="console__empty">The session exists but has no turns yet.</p>
               )
             ) : (
-              <p className="console__empty">
-                Waiting for the Claude Code session to start — no transcript captured yet. It
-                appears here automatically once the session's first message lands.
+              <p className="console__empty thread-transcript__waiting">
+                <WorkingIndicator
+                  className="launcher__spinner"
+                  label="Waiting for the first turn"
+                />
+                <span>No turns captured yet — they stream in here as the session runs.</span>
               </p>
             )}
           </section>
@@ -286,11 +296,10 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
           <ResumePanel
             threadId={thread.id}
             deepLink={projection.deepLink}
-            openRepoLink={projection.openRepoLink}
             cliCommand={projection.cliCommand}
             resumeCommand={projection.resumeCommand}
             schemeRegistered={projection.schemeRegistered}
-            matched={projection.status === "matched"}
+            homeResolved={projection.homeResolved}
           />
         </>
       ) : (
@@ -379,6 +388,25 @@ export default function Thread({ loaderData }: Route.ComponentProps) {
 
       <BranchForm lastMessageId={lastMessageId} />
     </main>
+  );
+}
+
+/**
+ * The Owner's opening ask, leading the transcript when the projection has no turns to carry it
+ * (work-089/work-104). It reuses the transcript's own owner-bubble rhythm — one design language,
+ * not a second one — and a quiet caption marks it as the seed so the ask is never lost or
+ * mistaken for a live turn. Rendered at most once (see `showSeedOpener`); never duplicated.
+ */
+function SeedOpener({ text }: { text: string }) {
+  return (
+    <div className="thread thread--transcript">
+      <div className="msg msg--owner msg--opener">
+        <span className="msg__author">
+          you <span className="msg__caption">· opening ask</span>
+        </span>
+        <p className="msg__body">{text}</p>
+      </div>
+    </div>
   );
 }
 

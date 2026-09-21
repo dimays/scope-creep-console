@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { claudeProjectDirName } from "./claude-sessions";
 import {
+  __resetSchemeCache,
   findSessionForThread,
   projectSessionFile,
+  resolveControlPlaneHome,
   resolveThreadProjection,
   verifyClaudeCliScheme,
 } from "./claude-sessions.server";
@@ -99,11 +101,45 @@ describe("resolveThreadProjection (orchestration)", () => {
     );
     expect(p.status).toBe("not-launched");
     expect(p.turns).toEqual([]);
-    expect(p.deepLink).toContain("claude://code/new?q=");
-    expect(p.deepLink).toContain(`folder=${encodeURIComponent(CWD)}`);
+    expect(p.homeResolved).toBe(true);
+    // Corrected scheme (work-098): claude-cli://open?cwd=…&q=…, no code/new, no folder.
+    expect(p.deepLink).toContain("claude-cli://open?cwd=");
+    expect(p.deepLink).toContain(`cwd=${encodeURIComponent(CWD)}`);
+    expect(p.deepLink).not.toContain("code/new");
+    expect(p.deepLink).not.toContain("folder=");
     // The correlation marker survives into q so work-047 can resolve the resulting session.
     expect(p.deepLink).toContain(encodeURIComponent("[scope-creep-thread:7]"));
     expect(typeof p.schemeRegistered).toBe("boolean");
+  });
+
+  it("unresolved home → null launch affordances, no bogus cwd (work-099 honest fallback)", async () => {
+    // Passing cwd:null models resolveControlPlaneHome() returning null (home not on disk).
+    const p = await resolveThreadProjection(
+      { id: 7, launchedAt: null, sessionUuid: null, sessionPath: null },
+      "Give me a concise State of the Product.",
+      null,
+    );
+    expect(p.status).toBe("not-launched");
+    expect(p.homeResolved).toBe(false);
+    expect(p.cwd).toBeNull();
+    expect(p.deepLink).toBeNull();
+    expect(p.cliCommand).toBeNull();
+    expect(p.openRepoLink).toBeNull();
+  });
+
+  it("unresolved home still correlates a launched session (scan is home-independent)", async () => {
+    // Even with no launch URL, a launched thread whose session already landed must still link:
+    // the marker scan runs over every project dir, not just the (missing) home.
+    const p = await resolveThreadProjection(
+      { id: 7, launchedAt: Date.now(), sessionUuid: null, sessionPath: null },
+      "Give me a concise State of the Product.",
+      null,
+    );
+    expect(p.homeResolved).toBe(false);
+    expect(p.deepLink).toBeNull();
+    expect(p.status).toBe("matched");
+    expect(p.sessionUuid).toBe(SESSION_UUID);
+    expect(p.resumeCommand).toBe(`claude --resume ${SESSION_UUID}`);
   });
 
   it("launched + uncorrelated → resolves by marker and flags newlyResolved", async () => {
@@ -142,8 +178,53 @@ describe("resolveThreadProjection (orchestration)", () => {
   });
 });
 
+describe("resolveControlPlaneHome (work-099 hardening)", () => {
+  const prevHome = process.env.SCOPE_CREEP_HOME;
+  afterAll(() => {
+    if (prevHome === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prevHome;
+  });
+
+  it("returns an absolute, real dir when SCOPE_CREEP_HOME points at one", () => {
+    // `root` is a real tmp dir created in beforeAll — a valid stand-in for the control plane.
+    process.env.SCOPE_CREEP_HOME = root;
+    const resolved = resolveControlPlaneHome();
+    expect(resolved).toBe(root);
+  });
+
+  it("returns null when SCOPE_CREEP_HOME is a bogus/non-existent path (fail honestly)", () => {
+    process.env.SCOPE_CREEP_HOME = join(root, "definitely", "not", "here");
+    expect(resolveControlPlaneHome()).toBeNull();
+  });
+
+  it("returns null rather than a bogus relative path when the sibling default is missing", () => {
+    // Empty env → the historical `<cwd>/../scope-creep` default; under the test runner that
+    // path won't be a real dir, so we must get null, never a coincidence-dependent string.
+    delete process.env.SCOPE_CREEP_HOME;
+    const resolved = resolveControlPlaneHome();
+    // Either the real sibling exists (absolute) or it doesn't (null) — never relative/bogus.
+    if (resolved !== null) expect(resolved.startsWith("/")).toBe(true);
+  });
+});
+
 describe("verifyClaudeCliScheme", () => {
   it("resolves to a boolean without throwing", async () => {
     expect(typeof (await verifyClaudeCliScheme())).toBe("boolean");
+  });
+
+  it("honors the SC_CLAUDE_CLI_SCHEME override in both directions", async () => {
+    const prev = process.env.SC_CLAUDE_CLI_SCHEME;
+    try {
+      process.env.SC_CLAUDE_CLI_SCHEME = "1";
+      __resetSchemeCache();
+      expect(await verifyClaudeCliScheme()).toBe(true);
+      process.env.SC_CLAUDE_CLI_SCHEME = "0";
+      __resetSchemeCache();
+      expect(await verifyClaudeCliScheme()).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.SC_CLAUDE_CLI_SCHEME;
+      else process.env.SC_CLAUDE_CLI_SCHEME = prev;
+      __resetSchemeCache();
+    }
   });
 });
