@@ -26,6 +26,8 @@ export type WorkItem = {
   /** Employee-agent slugs staffed to this item (ADR-017). Empty when unstaffed. */
   assignees: string[];
   spec?: string;
+  /** Frontmatter `milestone:` value, if any (e.g. `owner-review`) — drives the work-sweep explicit-marker milestone trigger (work-086/087). */
+  milestone?: string;
   pr?: string;
   created: string;
   updated: string;
@@ -61,6 +63,7 @@ function toItem(fm: Record<string, string>, file: string): WorkItem {
       .map((s) => s.trim())
       .filter(Boolean),
     spec: fm.spec || undefined,
+    milestone: fm.milestone || undefined,
     pr: fm.pr || undefined,
     created: fm.created ?? "",
     updated: fm.updated ?? "",
