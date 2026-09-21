@@ -1,0 +1,93 @@
+# Escalation check — the FLOOR mechanical rail for ADR-022 trigger (d), ported to
+# the scope-creep-CONSOLE repo (Part 1c of the GitHub-write-access activation,
+# docs/owner-apply-github-write-access.md in the control-plane repo; work-088).
+#
+# Runs on every PR. Computes the changed paths and FAILS (holds the PR for the
+# Owner) if the diff touches an ESCALATION-CLASS path WITHOUT the Owner-approval
+# marker (the `owner-approved` label).
+#
+# ---------------------------------------------------------------------------
+# WHY THE CONSOLE PATH-SET DIFFERS FROM THE CONTROL PLANE'S
+# ---------------------------------------------------------------------------
+# The source of this rail lives in `dimays/scope-creep` (the control plane), whose
+# escalation-class paths are control-plane surfaces: charter/INVARIANTS, standards/**,
+# agents/**, loops/**, registry/**, ledger/** — NONE of which exist here. The console
+# is a **periphery TypeScript app** (React Router + Drizzle/libSQL), so its
+# escalation-class set is derived from first principles: what change here should HOLD
+# for the Owner rather than merge autonomously? See scripts/escalation-check.sh for
+# the exact list and its rationale. In short:
+#   - `.github/workflows/**`  — CI runs with repo secrets and can weaken gates.
+#   - `.github/CODEOWNERS`    — the required-review gate surface (INCLUDED here, unlike
+#                               the control plane, which excluded it ONLY for the
+#                               bootstrap PR that first introduced it; on the console it
+#                               already exists, so changing it = changing who can approve).
+#   - `.claude/**`            — local harness hook/permission config.
+#   - dependency + infra + deploy manifests (package.json, bun.lock, Dockerfile,
+#     .dockerignore, fly.toml/Procfile/*.tf, ...) — add cost / paid infra / change
+#     the shipped image (trigger (d), overlaps (a)).
+#   - DB / credential config (drizzle.config.ts, app/db/config.ts) and secret files
+#     (.env*) — the app's datastore-credential + secrets surface (trigger (b)).
+# Routine app work — routes/components/lib logic, `drizzle/**` migrations,
+# `app/db/schema.ts`, tests, docs, styles, build/tsconfig tooling — is deliberately
+# NOT escalation-class, so the org can self-merge periphery work per ADR-022.
+#
+# Clearing a hold: the Owner (and only the Owner) applies the `owner-approved` label,
+# which re-runs this required check green. HONEST LIMITATION (same as the source):
+# under the current shared GitHub identity the label is agent-forgeable; the App-based
+# routine (docs/owner-apply-github-write-access.md 1a) plus CODEOWNERS + a required
+# code-owner review are the real backstop. This rail makes escalation MECHANICAL and
+# AUDITABLE — it forces an explicit label event and stops the accidental/unreviewed
+# merge — but it is not un-spoofable on its own. See ADR-022 / ADR-023.
+name: Escalation check
+
+on:
+  pull_request:
+    # `labeled`/`unlabeled` are included so adding/removing the owner-approved
+    # label re-runs this required check and flips it green/red without a re-push.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  escalation:
+    # This name is the required-status-check CONTEXT the Owner adds to console branch
+    # protection post-merge. It MUST stay exactly this string.
+    name: Path-based auto-escalation (ADR-022 trigger d)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the base sha and head sha are both present for the
+          # three-dot diff the classifier uses.
+          fetch-depth: 0
+
+      - name: Detect Owner-approval marker (owner-approved label)
+        id: marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Read the CURRENT labels live (not the event snapshot) so a label added
+          # after the PR opened is honored on a labeled-event re-run.
+          labels="$(gh pr view "${{ github.event.pull_request.number }}" \
+            --json labels --jq '.labels[].name' 2>/dev/null || true)"
+          if printf '%s\n' "$labels" | grep -qx 'owner-approved'; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "owner-approved label present."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "owner-approved label absent."
+          fi
+
+      - name: Classify changed paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MARKER_PRESENT: ${{ steps.marker.outputs.present }}
+        run: |
+          if [ "$MARKER_PRESENT" = "true" ]; then
+            bash scripts/escalation-check.sh "$BASE_SHA" "$HEAD_SHA" --marker-present
+          else
+            bash scripts/escalation-check.sh "$BASE_SHA" "$HEAD_SHA"
+          fi
