@@ -1,7 +1,39 @@
-# Independent review authority = the machine account @scope-creep-review.
-# A Write (non-admin) GitHub USER, so it CAN be a code owner and satisfy
-# require_code_owner_reviews. It approves others' PRs; GitHub blocks it from
-# approving its own, so author != merger holds mechanically. The human Owner
-# (@dimays) is reserved for ESCALATION (the owner-approved label), not routine
-# review. (ADR-023 Phase 1; docs/owner-apply-reviewer-identity.md)
-* @scope-creep-review
+# CODEOWNERS — ADR-023 Phase 2 split (console).
+#
+# Mirror of the control plane's split, on this repo's surfaces:
+#   * PERIPHERY (routine app work) -> @scope-creep-review (machine account;
+#     satisfies require_code_owner_reviews, cannot self-approve).
+#   * ESCALATION SET (CI / hooks / gate script / infra + DB config / secrets)
+#     -> HUMAN Owner @dimays ONLY, so the unattended reviewer identity cannot
+#     self-dispose a change to the gates or the deploy/DB surface.
+#
+# CODEOWNERS = LAST matching pattern wins; escalation set overrides the default.
+#
+# (ADR-023 Phase 2; ADR-026; docs/owner-apply-work-sweep-unpause.md; work-117.)
+
+# --- periphery default: routine review by the machine account ---
+*                                   @scope-creep-review
+
+# --- escalation set: HUMAN-ONLY Owner review (@dimays) ---
+/.github/                           @dimays
+/.claude/                           @dimays
+# gate scripts
+/scripts/escalation-check*.sh       @dimays
+/scripts/guard-*.sh                 @dimays
+# infra / lock manifests
+/package.json                       @dimays
+/package-lock.json                  @dimays
+/bun.lock                           @dimays
+/bun.lockb                          @dimays
+/Dockerfile                         @dimays
+/.dockerignore                      @dimays
+/fly.toml                           @dimays
+/Procfile                           @dimays
+/app.json                           @dimays
+/heroku.yml                         @dimays
+# DB config
+/drizzle.config.ts                  @dimays
+/app/db/config.ts                   @dimays
+# secrets / env
+/.env                               @dimays
+/.env.*                             @dimays
