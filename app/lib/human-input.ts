@@ -57,6 +57,25 @@ export function isExpandable(summary: string, excerpt?: string): boolean {
 // one line to extend if a new injected wrapper appears.
 const INJECTED_TAGS = ["task-notification", "system-reminder", "ci-monitor-event"] as const;
 
+// Tool/command-driven blocks the harness echoes into the prompt stream: bang-command I/O
+// (`<bash-input>…</bash-input><bash-stdout>…`), slash-command expansions, and local-command
+// output. A captured prompt that BEGINS with one of these is never the Owner typing prose —
+// it's a command execution that rode in on UserPromptSubmit — so the whole line is dropped.
+// This is the read-side twin of the capture-hook classifier (log-human-input.py): the hook
+// stops writing these, and this filter stops rendering any that were already captured
+// (recurrence of the work-095/096 pollution — see ledger). Extend in one line if a new
+// tool/command wrapper appears.
+const TOOL_COMMAND_TAGS = [
+  "bash-input",
+  "bash-stdout",
+  "bash-stderr",
+  "local-command-stdout",
+  "local-command-caveat",
+  "command-name",
+  "command-message",
+  "command-args",
+] as const;
+
 // Matches a single injected block anchored at the START of the text: `<tag …>…</tag>` with
 // any attributes, non-greedy body, case-insensitive. The `\1` backreference pins the close
 // to the same tag so an unrelated later block isn't swallowed.
@@ -65,13 +84,25 @@ const INJECTED_LEADING_BLOCK = new RegExp(
   "i",
 );
 
+// Matches the OPENING of a tool/command block at the START of the text. We only need the
+// open tag: its mere presence at the front marks the whole prompt as tool-driven, so the
+// line is dropped wholesale rather than partially salvaged.
+const TOOL_COMMAND_LEADING_OPEN = new RegExp(`^\\s*<(${TOOL_COMMAND_TAGS.join("|")})\\b`, "i");
+
 /**
- * Return only what the Owner actually typed in a captured operator-session prompt, with
- * any harness-injected wrapper blocks (see {@link INJECTED_TAGS}) stripped from the front.
- * Injected blocks stack — e.g. a `<system-reminder>` can precede a real directive, and two
- * reminders can precede it — so we strip leading blocks repeatedly and keep the remainder.
- * Returns `""` when the line was purely injected (a bare `<task-notification>` with no human
- * text); the caller drops those from the log rather than showing a non-human "input".
+ * Return only what the Owner actually typed in a captured operator-session prompt, or `""`
+ * when the prompt was not genuine human input. Two rules, applied in order:
+ *
+ *  1. Strip any harness-injected wrapper blocks (see {@link INJECTED_TAGS}) from the front.
+ *     They stack — a `<system-reminder>` can precede a real directive, two reminders can
+ *     precede it — so we strip leading blocks repeatedly and keep the remainder.
+ *  2. If what remains is empty (a bare `<task-notification>` with no human text), or begins
+ *     with a tool/command block (see {@link TOOL_COMMAND_TAGS} — a bang-command, slash
+ *     command, or local-command output that rode in on UserPromptSubmit), return `""`.
+ *
+ * The caller drops `""` results rather than showing a non-human "input". This mirrors the
+ * capture-side classifier in `.claude/hooks/log-human-input.py` so the log is clean whether
+ * a line is filtered at capture (new lines) or at read (lines captured before the hook fix).
  */
 export function operatorInputText(text: string): string {
   let out = text.trim();
@@ -80,6 +111,8 @@ export function operatorInputText(text: string): string {
     if (next === out) break; // no leading injected block left
     out = next;
   }
+  if (out.length === 0) return "";
+  if (TOOL_COMMAND_LEADING_OPEN.test(out)) return ""; // tool/command I/O, not Owner prose
   return out;
 }
 

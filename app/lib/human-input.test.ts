@@ -66,6 +66,39 @@ describe("operatorInputText", () => {
     const line = "why does the log show <task-notification> entries as if I typed them?";
     expect(operatorInputText(line)).toBe(line);
   });
+
+  // --- Tool/command I/O is not human input (recurrence guard for the pollution bug) ---
+
+  it("drops a bang-command line (bash-input/bash-stdout) → empty", () => {
+    const line =
+      "<bash-input>gh pr merge 96 -R dimays/scope-creep --squash</bash-input><bash-stdout>✓ Squashed and merged</bash-stdout>";
+    expect(operatorInputText(line)).toBe("");
+  });
+
+  it("drops a curl bang-command line → empty", () => {
+    const line =
+      "<bash-input>curl -s https://example.com/health</bash-input><bash-stdout>ok</bash-stdout>";
+    expect(operatorInputText(line)).toBe("");
+  });
+
+  it("drops a local-command / slash-command expansion → empty", () => {
+    expect(
+      operatorInputText("<command-name>/review</command-name><command-args>PR 98</command-args>"),
+    ).toBe("");
+    expect(operatorInputText("<local-command-stdout>done</local-command-stdout>")).toBe("");
+  });
+
+  it("drops a tool block even behind a leading system-reminder", () => {
+    const line =
+      "<system-reminder>heads up</system-reminder>\n<bash-input>gh pr view 99</bash-input><bash-stdout>OPEN</bash-stdout>";
+    expect(operatorInputText(line)).toBe("");
+  });
+
+  it("keeps a human message that mentions a bash command in prose", () => {
+    // The block must be LEADING to be dropped; describing a command is human input.
+    const line = "run the bash-input hook check before we merge";
+    expect(operatorInputText(line)).toBe(line);
+  });
 });
 
 describe("checkInputConsistency", () => {

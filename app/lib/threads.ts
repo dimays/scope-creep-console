@@ -196,13 +196,30 @@ export type NotifiableMessage = {
 };
 
 /**
- * Build the notification feed (work-063): what needs the Owner (his `needs-you` threads) plus
- * recent notable org updates (`critical-update` / `needs-input`), **newest-first**, each linking
- * to its thread. Archived threads never appear. Dedup: a `needs-you` thread that already shows
- * up as a notable message isn't repeated as a bare "parked" row — the message is the richer
- * signal — so a thread parked by a plain `orgFollowup` (no typed card) still surfaces as a
- * needs-you row. Pure: the caller supplies threads (with resolved read-state) and the notable
- * messages; ordering, dedup, and unread flags are decided here so they're unit-testable.
+ * What qualifies as **notification-worthy** (the signal, not the noise — work-063, refined to
+ * kill the flood the Owner flagged). The notification center is an *attention* surface, so a
+ * thread earns **at most one** row, chosen by priority:
+ *
+ *   1. BLOCKER — the thread is parked on the Owner (`status === "needs-you"`) OR its newest
+ *      notable message is a `needs-input`. This is a genuine "your turn": a judgment call, a
+ *      sign-off, a STOP-gate. Always shown, and it **persists until the thread is no longer
+ *      parked** — a standing blocker doesn't clear just because he glanced at it. A
+ *      `needs-input` card, when present, provides the richer label; otherwise the bare
+ *      needs-you thread surfaces on its own.
+ *   2. FYI — the thread has `critical-update`(s) and is NOT a blocker. `critical-update` keeps
+ *      the org's turn; it's informational. So FYIs are **collapsed to the single newest update
+ *      per thread** (a burst of progress pings on one thread is one row, never N) and shown
+ *      **only while the thread has unread org activity**. Once the Owner opens the thread the
+ *      FYI is consumed and drops out of the attention feed — it still lives in the thread's
+ *      own history. This preserves the transparent-delegation signal (consequential updates do
+ *      appear, once each, until seen) without the low-value repetition.
+ *
+ * Threads with neither a blocker nor an unread FYI never appear. Anything that isn't a
+ * `needs-input` / `critical-update` card or a parked thread is routine chatter and is ignored
+ * ({@link isNotableUpdate}). **Newest-first**, deterministic tie-break by thread id.
+ *
+ * Pure: the caller supplies threads (with resolved read-state) and the notable messages;
+ * ordering, collapse, priority, and unread flags are decided here so they're unit-testable.
  */
 export function buildNotifications(
   threads: NotifiableThread[],
@@ -215,38 +232,69 @@ export function buildNotifications(
   const unreadOf = (t: NotifiableThread) =>
     isUnread({ lastOrgAt: t.lastOrgAt, lastReadAt: t.lastReadAt });
 
-  const items: NotificationItem[] = [];
-  const threadsWithMessage = new Set<number>();
-
+  // Collapse notable messages to the newest of each kind, per (non-archived) thread. This is
+  // where a burst of same-thread updates becomes one signal instead of many rows.
+  const newestNeedsInput = new Map<number, NotifiableMessage>();
+  const newestCritical = new Map<number, NotifiableMessage>();
   for (const m of notableMessages) {
-    if (!isNotableUpdate(m.type)) continue;
-    const t = byId.get(m.conversationId);
-    if (!t) continue; // unknown or archived thread → skip
-    threadsWithMessage.add(t.id);
-    const meta = parseMeta(m.meta);
-    items.push({
-      threadId: t.id,
-      title: threadTitle(t),
-      kind: m.type as NotificationKind,
-      label: meta.label ?? m.body ?? threadTitle(t),
-      ts: m.at,
-      unread: unreadOf(t),
-      href: `/threads/${t.id}`,
-    });
+    if (!byId.has(m.conversationId)) continue; // unknown or archived thread → skip
+    const bucket =
+      m.type === "needs-input"
+        ? newestNeedsInput
+        : m.type === "critical-update"
+          ? newestCritical
+          : null;
+    if (!bucket) continue; // not a notable write-back type
+    const cur = bucket.get(m.conversationId);
+    if (!cur || m.at > cur.at) bucket.set(m.conversationId, m);
   }
 
+  const items: NotificationItem[] = [];
   for (const t of byId.values()) {
-    if (t.status !== "needs-you") continue;
-    if (threadsWithMessage.has(t.id)) continue; // already shown via its notable message
-    items.push({
-      threadId: t.id,
-      title: threadTitle(t),
-      kind: "needs-you",
-      label: threadTitle(t),
-      ts: t.updatedAt,
-      unread: unreadOf(t),
-      href: `/threads/${t.id}`,
-    });
+    const unread = unreadOf(t);
+    const needsInput = newestNeedsInput.get(t.id);
+
+    // (1) BLOCKER — parked on the Owner (via status or a needs-input card). Always shown.
+    if (t.status === "needs-you" || needsInput) {
+      if (needsInput) {
+        const meta = parseMeta(needsInput.meta);
+        items.push({
+          threadId: t.id,
+          title: threadTitle(t),
+          kind: "needs-input",
+          label: meta.label ?? needsInput.body ?? threadTitle(t),
+          ts: needsInput.at,
+          unread,
+          href: `/threads/${t.id}`,
+        });
+      } else {
+        items.push({
+          threadId: t.id,
+          title: threadTitle(t),
+          kind: "needs-you",
+          label: threadTitle(t),
+          ts: t.updatedAt,
+          unread,
+          href: `/threads/${t.id}`,
+        });
+      }
+      continue; // a thread earns at most one row; the blocker wins.
+    }
+
+    // (2) FYI — a single collapsed critical-update, only while unread (else it's consumed).
+    const critical = newestCritical.get(t.id);
+    if (critical && unread) {
+      const meta = parseMeta(critical.meta);
+      items.push({
+        threadId: t.id,
+        title: threadTitle(t),
+        kind: "critical-update",
+        label: meta.label ?? critical.body ?? threadTitle(t),
+        ts: critical.at,
+        unread: true,
+        href: `/threads/${t.id}`,
+      });
+    }
   }
 
   // Newest-first; tie-break by thread id (desc) so ordering is deterministic.

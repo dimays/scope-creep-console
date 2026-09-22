@@ -229,6 +229,60 @@ describe("notification feed (work-063)", () => {
     const messages = [msg({ conversationId: 8, type: "message", at: 90 })];
     expect(buildNotifications(threads, messages)).toEqual([]);
   });
+
+  // --- Noise reduction: collapse + consume FYIs (Owner "absurd notifications" fix) ---
+
+  it("collapses a burst of critical-updates on one thread into a single newest row", () => {
+    const threads = [thread({ id: 10, status: "working", updatedAt: 5, lastOrgAt: 5 })];
+    const messages = [
+      msg({ conversationId: 10, type: "critical-update", at: 1, meta: '{"label":"step 1"}' }),
+      msg({ conversationId: 10, type: "critical-update", at: 2, meta: '{"label":"step 2"}' }),
+      msg({ conversationId: 10, type: "critical-update", at: 5, meta: '{"label":"step 3"}' }),
+    ];
+    const items = buildNotifications(threads, messages);
+    expect(items).toHaveLength(1); // three pings → one row
+    expect(items[0].kind).toBe("critical-update");
+    expect(items[0].label).toBe("step 3"); // the newest survives
+    expect(items[0].ts).toBe(5);
+  });
+
+  it("drops a critical-update FYI once the thread has been read (consumed, not a standing signal)", () => {
+    const threads = [
+      // read: lastReadAt >= lastOrgAt → not unread → FYI consumed, no row.
+      thread({ id: 11, status: "working", updatedAt: 40, lastOrgAt: 40, lastReadAt: 40 }),
+      // unread: still surfaces.
+      thread({ id: 12, status: "working", updatedAt: 30, lastOrgAt: 30, lastReadAt: null }),
+    ];
+    const messages = [
+      msg({ conversationId: 11, type: "critical-update", at: 40, meta: '{"label":"seen"}' }),
+      msg({ conversationId: 12, type: "critical-update", at: 30, meta: '{"label":"unseen"}' }),
+    ];
+    const items = buildNotifications(threads, messages);
+    expect(items.map((i) => i.threadId)).toEqual([12]); // only the unread FYI
+    expect(items[0].label).toBe("unseen");
+  });
+
+  it("a needs-you blocker persists even after the thread is read (a standing 'your turn')", () => {
+    const threads = [
+      thread({ id: 13, status: "needs-you", updatedAt: 20, lastOrgAt: 20, lastReadAt: 99 }),
+    ];
+    const items = buildNotifications(threads, []);
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe("needs-you");
+    expect(items[0].unread).toBe(false); // shown despite being read — it's a blocker
+  });
+
+  it("a blocker outranks an FYI on the same thread: one needs-input row, not two", () => {
+    const threads = [thread({ id: 14, status: "needs-you", updatedAt: 60, lastOrgAt: 60 })];
+    const messages = [
+      msg({ conversationId: 14, type: "critical-update", at: 50, meta: '{"label":"progress"}' }),
+      msg({ conversationId: 14, type: "needs-input", at: 60, meta: '{"label":"decide this"}' }),
+    ];
+    const items = buildNotifications(threads, messages);
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe("needs-input");
+    expect(items[0].label).toBe("decide this");
+  });
 });
 
 describe("parseMeta", () => {
