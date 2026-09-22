@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations } from "~/db/schema";
 import { controlPlaneRepoDir } from "./authoring.server";
@@ -43,6 +43,96 @@ import { postCriticalUpdate, postNeedsInput } from "./threads.server";
  * local file/`:memory:` db, and dry-run returns the *planned* write/PR without performing it.
  */
 
+// --- Fixture denylist (work-115 defense-in-depth) -------------------------
+
+/**
+ * **Defense-in-depth ONLY — not the fix.** work-115: console test helpers once wrote their
+ * verbatim `createThread(...)` fixtures into the shared store (a test run resolved the db to the
+ * remote Turso endpoint instead of `:memory:`), and the request-triage sweep re-triaged ~200 of
+ * them every hour, burning budget. The real fix closes that leak at the source — the db is pinned
+ * local for tests and a setup guard aborts any run that would target a remote store (see
+ * console `vitest.config.ts` + `test/guard-local-db.ts`) — and the already-leaked rows are removed
+ * from the store under an Owner-gated cleanup (docs/owner-cleanup-work-115-fixture-threads.md).
+ *
+ * This denylist is the belt to that suspenders: if a fixture *ever* reaches the store again it is
+ * silently skipped by the sweep so no budget is spent on it. It matches the **exact `title` +
+ * `body` pair** of a known fixture — never a substring, never title-alone — because
+ * genuine and fixture request threads travel the *identical* `createThread` path (no
+ * source/origin column exists to distinguish them; see `app/db/schema.ts` — a request thread is
+ * `kind:"request"`, `initiator:"owner"`, opener `role:"owner"`, whether real or a fixture). The
+ * exact-pair requirement is what keeps this from ever dropping a real Owner request.
+ *
+ * **Honest limits (why this is secondary, not primary):**
+ *   - It only knows the fixtures enumerated here. A NEW test fixture would leak until added — so
+ *     this must never be relied on in place of the db isolation above.
+ *   - A handful of pairs are terse (e.g. body "test" / "…"). A real Owner request would have to
+ *     match BOTH the synthetic title AND that body verbatim to be dropped, which is why the risk
+ *     is negligible — but it is not literally zero, so the entries stay pinned to exact pairs.
+ *
+ * Keyed by JSON.stringify([title, body]). Sourced from app/lib/{triage,threads,human-input}.server.test.ts.
+ */
+const FIXTURE_THREAD_PAIRS: ReadonlyArray<readonly [title: string, body: string]> = [
+  // triage.server.test.ts
+  ["Add a dark mode toggle", "Please add dark mode."],
+  ["Wire the badge", "Build the unread badge."],
+  ["Old ask", "please do X"],
+  ["First", "1"],
+  ["Second", "2"],
+  ["Dry one", "test"],
+  ["FYI path", "test"],
+  ["Judgment path", "test"],
+  ["Close it", "test"],
+  // threads.server.test.ts (createThread — request kind)
+  ["Ship the queue", "Please build the needs-you queue."],
+  ["A question", "What should we prioritize?"],
+  ["Done thing", "Thanks!"],
+  ["Roadmap", "Let's talk Q4 priorities."],
+  ["Keep working", "Please keep building."],
+  ["P", "…"],
+  ["Solo", "No branches here."],
+  ["New idea", "Could we branch tangents into threads?"],
+  ["Idea 2", "Another one."],
+  ["Launch me", "Give me a State of the Product."],
+  ["Edit at launch", "First draft of the ask."],
+  ["Correlate me", "Do a thing."],
+  ["Fresh", "Nothing launched yet."],
+  ["Wrap it up", "This one is done — tuck it away."],
+  ["Closed then archived", "Done and away."],
+  ["Stay visible", "Keep me on the board."],
+  ["Hide me", "Off the board, please."],
+  ["Round trip", "Archive then restore me."],
+  ["Build the loop", "Please build the request loop."],
+  ["Scope call", "Kick this off."],
+  ["Sessionless", "No Claude session launched here."],
+  ["Override", "…"],
+  ["Read me", "Owner opens this."],
+  ["Re-raise", "…"],
+  ["Notif A", "…"],
+  ["Notif B", "…"],
+  ["Clear flag", "…"],
+  ["Archive from notif", "…"],
+  // threads.server.test.ts (branchThread children — request kind, owner-initiated)
+  ["Theme 2 as its own effort", "Theme 2 deserves its own thread — let's scope it."],
+  ["Tangent", "A side thought."],
+  ["Child", "Scope this."],
+  // human-input.server.test.ts (direct request-thread insert)
+  ["a work request", "a work request"],
+];
+
+const FIXTURE_DENYLIST: ReadonlySet<string> = new Set(
+  FIXTURE_THREAD_PAIRS.map(([title, body]) => JSON.stringify([title, body])),
+);
+
+/**
+ * Whether a swept thread is a **known console test fixture** (work-115) — an exact `title` + its
+ * opener `body` match against {@link FIXTURE_DENYLIST}. `openerBody` is the thread's first
+ * `role:"owner"` message body (the ask). Conservative by construction: an exact full-pair match
+ * only, so it never drops a genuine Owner request. Defense-in-depth; see the denylist doc.
+ */
+export function isKnownFixtureThread(title: string, openerBody: string): boolean {
+  return FIXTURE_DENYLIST.has(JSON.stringify([title, openerBody]));
+}
+
 // --- Sweep (loop step 1) --------------------------------------------------
 
 /**
@@ -51,6 +141,11 @@ import { postCriticalUpdate, postNeedsInput } from "./threads.server";
  * outcome back (a `critical-update` / `needs-input` card, both `role = agent`) a thread drops
  * out of the sweep, so it is never re-triaged ([[request-triage]] termination). `chat`-kind
  * and org-initiated threads are never swept.
+ *
+ * Known console test fixtures ({@link isKnownFixtureThread}) are also skipped — defense-in-depth
+ * against the work-115 shared-store contamination (the primary fix is the test-db isolation in
+ * `vitest.config.ts` + `test/guard-local-db.ts`; this only stops budget being spent should a
+ * fixture ever reach the store again).
  */
 export async function listNewRequestThreads(): Promise<Thread[]> {
   await ensureSchema();
@@ -72,7 +167,29 @@ export async function listNewRequestThreads(): Promise<Thread[]> {
     )
     .orderBy(asc(conversations.createdAt));
 
-  return threads.filter((t) => !answeredIds.has(t.id));
+  const candidates = threads.filter((t) => !answeredIds.has(t.id));
+  if (candidates.length === 0) return candidates;
+
+  // Load each candidate's opener (first owner message) to match the exact title+body fixture
+  // pairs. Only the swept candidates are inspected, so this is bounded by the untriaged queue.
+  const openerRows = await db
+    .select({ cid: conversationMessages.conversationId, body: conversationMessages.body })
+    .from(conversationMessages)
+    .where(
+      and(
+        inArray(
+          conversationMessages.conversationId,
+          candidates.map((t) => t.id),
+        ),
+        eq(conversationMessages.role, "owner"),
+        eq(conversationMessages.type, "message"),
+      ),
+    )
+    .orderBy(asc(conversationMessages.at));
+  const openerBody = new Map<number, string>();
+  for (const r of openerRows) if (!openerBody.has(r.cid)) openerBody.set(r.cid, r.body);
+
+  return candidates.filter((t) => !isKnownFixtureThread(t.title, openerBody.get(t.id) ?? ""));
 }
 
 // --- Write-back (loop step 4) ---------------------------------------------
