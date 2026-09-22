@@ -144,16 +144,81 @@ proceed — adjust the pair list or narrow the query and re-preview.
 
 ## Step 2 — Archive them (reversible; recommended)
 
-Run inside a transaction so you can `ROLLBACK` if the count surprises you.
+Self-contained and copy-paste runnable. It first materializes the fixture ids into a temp table
+(the same identification as Step 1 — a CTE can only attach to one statement, so we stage the ids
+so this and every later step can reuse them), then archives inside a transaction you can
+`ROLLBACK`.
 
 ```sql
+-- Stage the fixture conversation ids into a temp table (identical pair list to Step 1).
+DROP TABLE IF EXISTS temp.fixture_ids;
+CREATE TEMP TABLE fixture_ids AS
+WITH fixture(title, body) AS (
+  VALUES
+    ('Add a dark mode toggle', 'Please add dark mode.'),
+    ('Wire the badge', 'Build the unread badge.'),
+    ('Old ask', 'please do X'),
+    ('First', '1'),
+    ('Second', '2'),
+    ('Dry one', 'test'),
+    ('FYI path', 'test'),
+    ('Judgment path', 'test'),
+    ('Close it', 'test'),
+    ('Ship the queue', 'Please build the needs-you queue.'),
+    ('A question', 'What should we prioritize?'),
+    ('Done thing', 'Thanks!'),
+    ('Roadmap', 'Let''s talk Q4 priorities.'),
+    ('Keep working', 'Please keep building.'),
+    ('P', '…'),
+    ('Solo', 'No branches here.'),
+    ('New idea', 'Could we branch tangents into threads?'),
+    ('Idea 2', 'Another one.'),
+    ('Launch me', 'Give me a State of the Product.'),
+    ('Edit at launch', 'First draft of the ask.'),
+    ('Correlate me', 'Do a thing.'),
+    ('Fresh', 'Nothing launched yet.'),
+    ('Wrap it up', 'This one is done — tuck it away.'),
+    ('Closed then archived', 'Done and away.'),
+    ('Stay visible', 'Keep me on the board.'),
+    ('Hide me', 'Off the board, please.'),
+    ('Round trip', 'Archive then restore me.'),
+    ('Build the loop', 'Please build the request loop.'),
+    ('Scope call', 'Kick this off.'),
+    ('Sessionless', 'No Claude session launched here.'),
+    ('Override', '…'),
+    ('Read me', 'Owner opens this.'),
+    ('Re-raise', '…'),
+    ('Notif A', '…'),
+    ('Notif B', '…'),
+    ('Clear flag', '…'),
+    ('Archive from notif', '…'),
+    ('Theme 2 as its own effort', 'Theme 2 deserves its own thread — let''s scope it.'),
+    ('Tangent', 'A side thought.'),
+    ('Child', 'Scope this.'),
+    ('a work request', 'a work request')
+),
+opener AS (
+  SELECT m.conversation_id AS cid, m.body AS body,
+         ROW_NUMBER() OVER (PARTITION BY m.conversation_id ORDER BY m.at ASC, m.id ASC) AS rn
+  FROM conversation_messages m
+  WHERE m.role = 'owner' AND m.type = 'message'
+)
+SELECT c.id AS id
+FROM conversations c
+JOIN opener o ON o.cid = c.id AND o.rn = 1
+JOIN fixture f ON f.title = c.title AND f.body = o.body
+WHERE c.kind = 'request';
+
+-- Sanity: this should match Step 1's fixture_thread_count.
+SELECT count(*) AS staged_fixture_ids FROM fixture_ids;
+
+-- Archive (reversible) inside a transaction.
 BEGIN;
--- Reuse the same CTEs as Step 1 (fixture / opener / fixture_convos), then:
 UPDATE conversations
 SET archived_at = CAST(strftime('%s','now') AS INTEGER) * 1000,   -- ms epoch, matches app writes
     updated_at  = CAST(strftime('%s','now') AS INTEGER) * 1000
-WHERE id IN (SELECT id FROM fixture_convos WHERE archived_at IS NULL);
--- Verify the number of changed rows matches `not_yet_archived` from Step 1, then:
+WHERE id IN (SELECT id FROM fixture_ids) AND archived_at IS NULL;
+-- Verify the changed-row count matches `not_yet_archived` from Step 1, then:
 COMMIT;   -- or ROLLBACK; if it doesn't match
 ```
 
@@ -173,29 +238,93 @@ Expect zero fixture titles in the output.
 
 ## Optional hard-delete (irreversible — only after you're satisfied)
 
-Only if you want the rows physically gone and you have the Step 0 backup. Delete children first
-(no FK cascade in this schema — `conversation_messages.conversation_id` is a plain column).
+Only if you want the rows physically gone and you have the Step 0 backup. Self-contained: it
+rebuilds the `fixture_ids` temp table (so it runs standalone, even in a fresh session that didn't
+run Step 2), then deletes children first (no FK cascade in this schema —
+`conversation_messages.conversation_id` is a plain column).
 
 ```sql
+-- Stage the fixture conversation ids (identical pair list to Step 1 / Step 2).
+DROP TABLE IF EXISTS temp.fixture_ids;
+CREATE TEMP TABLE fixture_ids AS
+WITH fixture(title, body) AS (
+  VALUES
+    ('Add a dark mode toggle', 'Please add dark mode.'),
+    ('Wire the badge', 'Build the unread badge.'),
+    ('Old ask', 'please do X'),
+    ('First', '1'),
+    ('Second', '2'),
+    ('Dry one', 'test'),
+    ('FYI path', 'test'),
+    ('Judgment path', 'test'),
+    ('Close it', 'test'),
+    ('Ship the queue', 'Please build the needs-you queue.'),
+    ('A question', 'What should we prioritize?'),
+    ('Done thing', 'Thanks!'),
+    ('Roadmap', 'Let''s talk Q4 priorities.'),
+    ('Keep working', 'Please keep building.'),
+    ('P', '…'),
+    ('Solo', 'No branches here.'),
+    ('New idea', 'Could we branch tangents into threads?'),
+    ('Idea 2', 'Another one.'),
+    ('Launch me', 'Give me a State of the Product.'),
+    ('Edit at launch', 'First draft of the ask.'),
+    ('Correlate me', 'Do a thing.'),
+    ('Fresh', 'Nothing launched yet.'),
+    ('Wrap it up', 'This one is done — tuck it away.'),
+    ('Closed then archived', 'Done and away.'),
+    ('Stay visible', 'Keep me on the board.'),
+    ('Hide me', 'Off the board, please.'),
+    ('Round trip', 'Archive then restore me.'),
+    ('Build the loop', 'Please build the request loop.'),
+    ('Scope call', 'Kick this off.'),
+    ('Sessionless', 'No Claude session launched here.'),
+    ('Override', '…'),
+    ('Read me', 'Owner opens this.'),
+    ('Re-raise', '…'),
+    ('Notif A', '…'),
+    ('Notif B', '…'),
+    ('Clear flag', '…'),
+    ('Archive from notif', '…'),
+    ('Theme 2 as its own effort', 'Theme 2 deserves its own thread — let''s scope it.'),
+    ('Tangent', 'A side thought.'),
+    ('Child', 'Scope this.'),
+    ('a work request', 'a work request')
+),
+opener AS (
+  SELECT m.conversation_id AS cid, m.body AS body,
+         ROW_NUMBER() OVER (PARTITION BY m.conversation_id ORDER BY m.at ASC, m.id ASC) AS rn
+  FROM conversation_messages m
+  WHERE m.role = 'owner' AND m.type = 'message'
+)
+SELECT c.id AS id
+FROM conversations c
+JOIN opener o ON o.cid = c.id AND o.rn = 1
+JOIN fixture f ON f.title = c.title AND f.body = o.body
+WHERE c.kind = 'request';
+
+-- Sanity before deleting: confirm the id count is what you expect.
+SELECT count(*) AS staged_fixture_ids FROM fixture_ids;
+
 BEGIN;
 -- messages belonging to fixture conversations
 DELETE FROM conversation_messages
-WHERE conversation_id IN (SELECT id FROM fixture_convos);
+WHERE conversation_id IN (SELECT id FROM fixture_ids);
 -- thread read-state rows, if any
 DELETE FROM thread_reads
-WHERE conversation_id IN (SELECT id FROM fixture_convos);
+WHERE conversation_id IN (SELECT id FROM fixture_ids);
 -- the conversations themselves
 DELETE FROM conversations
-WHERE id IN (SELECT id FROM fixture_convos);
+WHERE id IN (SELECT id FROM fixture_ids);
 COMMIT;   -- or ROLLBACK;
 ```
 
-(Re-declare the CTEs from Step 1 above each statement, or materialize the id list into a temp
-table first.) This is INVARIANTS §III/§10 territory: irreversible + destructive → your call,
-your keystroke, backed up.
+This is INVARIANTS §III/§10 territory: irreversible + destructive → your call, your keystroke,
+backed up.
 
 ## Reversal
 
-- Archived (Step 2): `UPDATE conversations SET archived_at = NULL WHERE id IN (...);` or the
-  app's Restore action.
+- Archived (Step 2): re-stage `fixture_ids` (the temp-table block from Step 2), then
+  `UPDATE conversations SET archived_at = NULL WHERE id IN (SELECT id FROM fixture_ids);` — or
+  just use the app's Restore action per thread.
 - Hard-deleted (optional): restore from the Step 0 `.dump`.

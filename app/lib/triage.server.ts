@@ -65,9 +65,13 @@ import { postCriticalUpdate, postNeedsInput } from "./threads.server";
  * **Honest limits (why this is secondary, not primary):**
  *   - It only knows the fixtures enumerated here. A NEW test fixture would leak until added — so
  *     this must never be relied on in place of the db isolation above.
- *   - A handful of pairs are terse (e.g. body "test" / "…"). A real Owner request would have to
- *     match BOTH the synthetic title AND that body verbatim to be dropped, which is why the risk
- *     is negligible — but it is not literally zero, so the entries stay pinned to exact pairs.
+ *   - The residual false-positive risk is NOT the terse pairs (e.g. "First"/"…", "P"/"…") — a
+ *     real request never looks like those. It is the handful of **natural feature-request pairs a
+ *     real Owner could plausibly re-file verbatim** — e.g. "Add a dark mode toggle"/"Please add
+ *     dark mode." or "Ship the queue"/"Please build the needs-you queue.". If the Owner ever files
+ *     one of those word-for-word (title AND body), the sweep would skip it. That risk is bounded
+ *     and low (it needs an exact full-pair match) — but not literally zero, which is exactly why
+ *     this stays defense-in-depth secondary to the DB isolation, never the primary guard.
  *
  * Keyed by JSON.stringify([title, body]). Sourced from app/lib/{triage,threads,human-input}.server.test.ts.
  */
