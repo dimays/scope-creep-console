@@ -65,6 +65,19 @@ import { postCriticalUpdate, postNeedsInput } from "./threads.server";
  * **Honest limits (why this is secondary, not primary):**
  *   - It only knows the fixtures enumerated here. A NEW test fixture would leak until added — so
  *     this must never be relied on in place of the db isolation above.
+ *   - **It cannot cover the sweep-path test fixtures by design.** A few `triage.server.test.ts`
+ *     fixtures (e.g. "Speed up the dashboard"/"The metrics view takes 8s to load.", "Export
+ *     threads to CSV"/…, "Older ask"/…, "Newer ask"/…, "Add SSO to the admin panel"/…, "Rename
+ *     the workspace"/…) exist precisely to prove the *genuine* sweep path and are asserted to BE
+ *     swept — so they can never be denylisted without breaking their own tests. If those leaked
+ *     pre-fix rows are still in the store they are handled by the Owner-gated cleanup's dedup
+ *     criterion, not here. This is the clearest reason the denylist is defense-in-depth only.
+ *   - **Org-initiated fixtures are out of scope here on purpose.** The sweep already filters
+ *     `initiator = "owner"` (see {@link listNewRequestThreads}), so an `initiator = "org"` fixture
+ *     (opener `role = "agent"`, e.g. "Org opener"/"The org needs your call.", "FYI"/"Heads up on
+ *     the design pin.", "Need input"/"Please decide.") can *never* reach this denylist and is
+ *     deliberately omitted. Those rows are still removed from the store by the cleanup doc's
+ *     dedup criterion, which — unlike this sweep filter — groups regardless of initiator.
  *   - The residual false-positive risk is NOT the terse pairs (e.g. "First"/"…", "P"/"…") — a
  *     real request never looks like those. It is the handful of **natural feature-request pairs a
  *     real Owner could plausibly re-file verbatim** — e.g. "Add a dark mode toggle"/"Please add
@@ -73,7 +86,9 @@ import { postCriticalUpdate, postNeedsInput } from "./threads.server";
  *     and low (it needs an exact full-pair match) — but not literally zero, which is exactly why
  *     this stays defense-in-depth secondary to the DB isolation, never the primary guard.
  *
- * Keyed by JSON.stringify([title, body]). Sourced from app/lib/{triage,threads,human-input}.server.test.ts.
+ * Keyed by JSON.stringify([title, body]). Sourced from an authoritative sweep of every
+ * test file under `app/`: app/lib/{triage,threads,human-input,work-sweep}.server.test.ts and
+ * app/routes/route-entrypoints.test.ts (owner-initiated `request` threads only — see limits above).
  */
 const FIXTURE_THREAD_PAIRS: ReadonlyArray<readonly [title: string, body: string]> = [
   // triage.server.test.ts
@@ -121,6 +136,16 @@ const FIXTURE_THREAD_PAIRS: ReadonlyArray<readonly [title: string, body: string]
   ["Child", "Scope this."],
   // human-input.server.test.ts (direct request-thread insert)
   ["a work request", "a work request"],
+  // route-entrypoints.test.ts (owner-initiated request threads via POST /threads + branch intent)
+  ["A test thread", "Please do the thing."],
+  ["Parent", "Let's discuss."],
+  ["A tangent", "This deserves its own thread."],
+  ["Parent 2", "…"],
+  ["Launch flow", "Give me a State of the Product."],
+  ["Archive me via route", "Please tuck this away."],
+  ["Round-trip via route", "Archive then restore."],
+  // work-sweep.server.test.ts (createThread — request kind)
+  ["Loop milestone", "please review"],
 ];
 
 const FIXTURE_DENYLIST: ReadonlySet<string> = new Set(

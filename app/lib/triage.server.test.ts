@@ -91,6 +91,17 @@ describe("known-fixture skip — defense-in-depth (work-115)", () => {
         "Theme 2 deserves its own thread — let's scope it.",
       ),
     ).toBe(true);
+    // work-115 (CoS re-audit): fixtures from the previously-unscanned test files.
+    // route-entrypoints.test.ts (owner-initiated request threads via the /threads route).
+    expect(isKnownFixtureThread("A test thread", "Please do the thing.")).toBe(true);
+    expect(isKnownFixtureThread("A tangent", "This deserves its own thread.")).toBe(true);
+    expect(isKnownFixtureThread("Round-trip via route", "Archive then restore.")).toBe(true);
+    // work-sweep.server.test.ts.
+    expect(isKnownFixtureThread("Loop milestone", "please review")).toBe(true);
+    // Org-initiated fixtures are intentionally NOT on the denylist — the sweep filters
+    // initiator="owner", so they can never reach it (the cleanup doc's dedup criterion
+    // removes them from the store instead).
+    expect(isKnownFixtureThread("Org opener", "The org needs your call.")).toBe(false);
     // Title-only or body-only matches are NOT enough (never drop a real request).
     expect(isKnownFixtureThread("Add a dark mode toggle", "A genuine, different ask.")).toBe(false);
     expect(isKnownFixtureThread("A genuine title", "Please add dark mode.")).toBe(false);
