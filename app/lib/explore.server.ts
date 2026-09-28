@@ -259,22 +259,33 @@ export type ActivityEvent = {
   /** ISO date/time or epoch-ms string, best-effort. */
   ts?: string;
   id?: string;
-  /** The agent slug that acted. */
+  /** The agent that acted — the delegator/parent, the creating executive, the runner. */
   actor: string;
-  /** spawn | delegate | staff | confer (per work-036); kept open for forward compat. */
+  /** spawn | delegate | staff | confer | run (per work-036 + the prd-org-activity-moments
+   *  target shape); kept open for forward compat. */
   type: string;
   summary: string;
   threadId?: number;
   /** A ledger entry / PR / thread URL or path the event points at. */
   refUrl?: string;
   sessionId?: string;
+  /** The agent acted upon — the child spun up, the employee staffed (edge events). */
+  target?: string;
+  /** Correlates a run's `start` and `finish` into one framed unit (run events). */
+  runId?: string;
+  /** `start | finish` (run events). */
+  phase?: string;
+  /** The supervisor edge captured at employee creation (staff events). */
+  reportsTo?: string;
 };
 
 /**
- * Parse one `activity/*.ndjson` line into a typed event (work-036 schema:
- * `{ts,id,actor,type,summary,threadId?,refUrl?,sessionId}`). Pure + unit-tested;
- * tolerant — a blank line, non-JSON, or an event missing `actor`/`type` yields null
- * (dropped) rather than throwing, so a partially-written log never breaks the feed.
+ * Parse one `activity/*.ndjson` line into a typed event (the prd-org-activity-moments
+ * target shape: `{ts,id,actor,type,summary,threadId?,refUrl?,sessionId,target?,runId?,
+ * phase?,reportsTo?}`). Pure + unit-tested; tolerant — a blank line, non-JSON, or an
+ * event missing `actor`/`type` yields null (dropped) rather than throwing, so a
+ * partially-written log never breaks the feed. Every new field is optional and additive,
+ * so the 63 backfilled thin rows keep parsing unchanged.
  */
 export function parseActivityLine(line: string): ActivityEvent | null {
   const t = line.trim();
@@ -298,6 +309,10 @@ export function parseActivityLine(line: string): ActivityEvent | null {
     threadId: typeof o.threadId === "number" ? o.threadId : undefined,
     refUrl: str(o.refUrl),
     sessionId: str(o.sessionId),
+    target: str(o.target),
+    runId: str(o.runId),
+    phase: str(o.phase),
+    reportsTo: str(o.reportsTo),
   };
 }
 
@@ -328,12 +343,109 @@ export async function activityForActor(actor: string): Promise<ActivityEvent[]> 
   return (await listActivity()).filter((e) => e.actor === actor);
 }
 
+/** The activity events a given agent was the **target** of, newest first — "who spun
+ *  this agent up" (work-081): the other end of an edge event (`spawn`/`delegate`/`staff`). */
+export async function activityForTarget(target: string): Promise<ActivityEvent[]> {
+  return (await listActivity()).filter((e) => e.target === target);
+}
+
 /** The activity events tied to a given thread, oldest first (they read as an inline
  *  timeline of what the org did inside that thread — work-031). */
 export async function activityForThread(threadId: number): Promise<ActivityEvent[]> {
   return (await listActivity())
     .filter((e) => e.threadId === threadId)
     .sort((a, b) => (a.ts ?? "").localeCompare(b.ts ?? ""));
+}
+
+/** A `type:"run"` `start`+`finish` pair folded into one framed unit (prd-org-activity-moments
+ *  moment 1). A lone `start` with no `finish` yet is `inProgress`; a lone `finish` with no
+ *  `start` on record still renders honestly (no fabricated start). */
+export type ActivityRunGroup = {
+  runId: string;
+  actor: string;
+  summary: string;
+  startedAt?: string;
+  finishedAt?: string;
+  /** `finishedAt - startedAt` in ms, only when both timestamps parse as real dates. */
+  durationMs?: number;
+  inProgress: boolean;
+  threadId?: number;
+  refUrl?: string;
+};
+
+/** An item in the grouped activity feed: either a passthrough event (anything that
+ *  isn't a pairable `type:"run"` event) or a folded {@link ActivityRunGroup}. */
+export type ActivityFeedEntry =
+  | { kind: "event"; event: ActivityEvent }
+  | { kind: "run"; run: ActivityRunGroup };
+
+function msOf(ts: string | undefined): number | undefined {
+  if (!ts) return undefined;
+  const ms = Date.parse(ts);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+/**
+ * Fold `type:"run"` events sharing a `runId` into one {@link ActivityRunGroup} per run,
+ * so a run reads as one framed unit with a duration rather than two unrelated rows
+ * (prd-org-activity-moments, work-081). Every other event passes through unchanged.
+ * Pure + order-preserving: never drops or fabricates an event — a run event with no
+ * `runId` (malformed) passes through as a plain event rather than being silently lost.
+ */
+export function groupActivityRuns(events: ActivityEvent[]): ActivityFeedEntry[] {
+  const runsById = new Map<string, { start?: ActivityEvent; finish?: ActivityEvent }>();
+  const out: ActivityFeedEntry[] = [];
+  const runIdOrder: string[] = [];
+
+  for (const ev of events) {
+    if (ev.type !== "run" || !ev.runId) {
+      out.push({ kind: "event", event: ev });
+      continue;
+    }
+    let slot = runsById.get(ev.runId);
+    if (!slot) {
+      slot = {};
+      runsById.set(ev.runId, slot);
+      runIdOrder.push(ev.runId);
+    }
+    if (ev.phase === "finish") slot.finish = ev;
+    else slot.start = ev; // "start", or an unrecognized phase — treat as the opening leg
+  }
+
+  const runs: ActivityFeedEntry[] = runIdOrder.map((runId) => {
+    const { start, finish } = runsById.get(runId) as {
+      start?: ActivityEvent;
+      finish?: ActivityEvent;
+    };
+    const canonical = start ?? (finish as ActivityEvent);
+    const startedAt = start?.ts;
+    const finishedAt = finish?.ts;
+    const startMs = msOf(startedAt);
+    const finishMs = msOf(finishedAt);
+    return {
+      kind: "run",
+      run: {
+        runId,
+        actor: canonical.actor,
+        summary: canonical.summary,
+        startedAt,
+        finishedAt,
+        durationMs:
+          startMs !== undefined && finishMs !== undefined ? finishMs - startMs : undefined,
+        inProgress: !finish,
+        threadId: canonical.threadId,
+        refUrl: finish?.refUrl ?? start?.refUrl,
+      },
+    };
+  });
+
+  // Newest-first, matching listActivity's ordering: a run sorts by its most recent leg
+  // (finish if it has one, else start); ties/interleaving with plain events resolve by that ts.
+  return [...out, ...runs].sort((a, b) => {
+    const tsOf = (e: ActivityFeedEntry): string =>
+      (e.kind === "event" ? e.event.ts : (e.run.finishedAt ?? e.run.startedAt)) ?? "";
+    return tsOf(b).localeCompare(tsOf(a));
+  });
 }
 
 /** The in-Console href an event points at: its refUrl (a path or URL) if present,

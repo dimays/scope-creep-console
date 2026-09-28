@@ -6,6 +6,7 @@ import { loader as loopLoader } from "../routes/explore-loop";
 import { loader as loopsLoader } from "../routes/explore-loops";
 import {
   activityForActor,
+  activityForTarget,
   activityForThread,
   activityHref,
   activityVerb,
@@ -15,6 +16,7 @@ import {
   describeCron,
   extractReferences,
   extractWikilinks,
+  groupActivityRuns,
   listActivity,
   listDocs,
   listLedger,
@@ -642,6 +644,48 @@ describe("activity: parseActivityLine / activityHref / activityVerb", () => {
     expect(parseActivityLine('{"actor":"cto"}')).toBeNull(); // no type
   });
 
+  // prd-org-activity-moments target record shape (work-081): the edge (target), run
+  // (runId/phase), and staffing (reportsTo) fields round-trip; every one is optional and
+  // additive, so the parser above's thin, pre-existing lines still parse unchanged.
+  it("round-trips the target-shape edge/run/staff fields", () => {
+    const edge = parseActivityLine(
+      '{"ts":"2026-09-07T05:00:00Z","actor":"chief-of-staff","type":"spawn","summary":"kicked off the cto","target":"cto"}',
+    );
+    expect(edge?.actor).toBe("chief-of-staff");
+    expect(edge?.target).toBe("cto");
+
+    const run = parseActivityLine(
+      '{"ts":"2026-09-07T10:02:00Z","actor":"work-sweep","type":"run","summary":"work-sweep sweep","runId":"r1","phase":"start"}',
+    );
+    expect(run?.runId).toBe("r1");
+    expect(run?.phase).toBe("start");
+
+    const staff = parseActivityLine(
+      '{"ts":"2026-09-07T05:00:00Z","actor":"cto","type":"staff","summary":"staffed linus","target":"linus","reportsTo":"cto"}',
+    );
+    expect(staff?.target).toBe("linus");
+    expect(staff?.reportsTo).toBe("cto");
+
+    // non-string values for the new fields degrade to undefined, never throw or coerce.
+    const malformed = parseActivityLine(
+      '{"actor":"cto","type":"spawn","summary":"x","target":7,"runId":null,"phase":true,"reportsTo":{}}',
+    );
+    expect(malformed).toEqual({
+      actor: "cto",
+      type: "spawn",
+      summary: "x",
+      ts: undefined,
+      id: undefined,
+      threadId: undefined,
+      refUrl: undefined,
+      sessionId: undefined,
+      target: undefined,
+      runId: undefined,
+      phase: undefined,
+      reportsTo: undefined,
+    });
+  });
+
   it("prefers refUrl, falls back to the thread, else null", () => {
     expect(
       activityHref({ actor: "a", type: "confer", summary: "", refUrl: "/explore/docs/adr-013" }),
@@ -700,6 +744,118 @@ describe("listActivity / activityForActor (hermetic)", () => {
   it("filters to one thread (work-031)", async () => {
     expect((await activityForThread(7)).map((e) => e.summary)).toEqual(["to ada"]);
     expect(await activityForThread(999)).toEqual([]);
+  });
+});
+
+// Org activity read-model uplift (work-081): the parent->child/staff edge is read via
+// `target`, and a run's start+finish fold into one framed unit for the feed.
+describe("activityForTarget / groupActivityRuns (hermetic)", () => {
+  let home: string;
+  let prev: string | undefined;
+
+  beforeAll(() => {
+    prev = process.env.SCOPE_CREEP_HOME;
+    home = mkdtempSync(join(tmpdir(), "scope-creep-activity-target-"));
+    mkdirSync(join(home, "activity"));
+    writeFileSync(
+      join(home, "activity", "2026-09.ndjson"),
+      [
+        '{"ts":"2026-09-07T05:00:00Z","actor":"chief-of-staff","type":"spawn","summary":"kicked off the cto","target":"cto"}',
+        '{"ts":"2026-09-07T05:00:00Z","actor":"cto","type":"staff","summary":"staffed linus","target":"linus","reportsTo":"cto"}',
+      ].join("\n"),
+    );
+    process.env.SCOPE_CREEP_HOME = home;
+  });
+
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SCOPE_CREEP_HOME;
+    else process.env.SCOPE_CREEP_HOME = prev;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("filters to one target — the other end of an edge event", async () => {
+    expect((await activityForTarget("cto")).map((e) => e.summary)).toEqual(["kicked off the cto"]);
+    expect((await activityForTarget("linus")).map((e) => e.summary)).toEqual(["staffed linus"]);
+    expect(await activityForTarget("nobody")).toEqual([]);
+  });
+});
+
+describe("groupActivityRuns (pure)", () => {
+  const start = {
+    ts: "2026-09-24T10:02:00Z",
+    actor: "work-sweep",
+    type: "run",
+    summary: "work-sweep sweep",
+    runId: "r1",
+    phase: "start",
+  };
+  const finish = {
+    ts: "2026-09-24T10:07:00Z",
+    actor: "work-sweep",
+    type: "run",
+    summary: "work-sweep sweep",
+    runId: "r1",
+    phase: "finish",
+    refUrl: "/ledger/073",
+  };
+  const plain = {
+    ts: "2026-09-24T09:00:00Z",
+    actor: "chief-of-staff",
+    type: "delegate",
+    summary: "to ada",
+  };
+
+  it("folds a start+finish pair into one run with a duration", () => {
+    const feed = groupActivityRuns([finish, start, plain]);
+    const runEntry = feed.find((e) => e.kind === "run");
+    expect(runEntry?.kind).toBe("run");
+    if (runEntry?.kind !== "run") throw new Error("expected a run entry");
+    expect(runEntry.run).toEqual({
+      runId: "r1",
+      actor: "work-sweep",
+      summary: "work-sweep sweep",
+      startedAt: "2026-09-24T10:02:00Z",
+      finishedAt: "2026-09-24T10:07:00Z",
+      durationMs: 5 * 60 * 1000,
+      inProgress: false,
+      threadId: undefined,
+      refUrl: "/ledger/073",
+    });
+    // the plain event passes through unchanged, and the feed stays newest-first.
+    expect(feed.map((e) => (e.kind === "event" ? e.event.summary : "[run]"))).toEqual([
+      "[run]",
+      "to ada",
+    ]);
+  });
+
+  it("renders a lone start as in-progress, never fabricating a finish", () => {
+    const feed = groupActivityRuns([start]);
+    expect(feed).toEqual([
+      {
+        kind: "run",
+        run: {
+          runId: "r1",
+          actor: "work-sweep",
+          summary: "work-sweep sweep",
+          startedAt: "2026-09-24T10:02:00Z",
+          finishedAt: undefined,
+          durationMs: undefined,
+          inProgress: true,
+          threadId: undefined,
+          refUrl: undefined,
+        },
+      },
+    ]);
+  });
+
+  it("passes a runId-less run event through as a plain event (never dropped)", () => {
+    const malformed = { ts: "2026-09-24T10:02:00Z", actor: "cto", type: "run", summary: "?" };
+    const feed = groupActivityRuns([malformed]);
+    expect(feed).toEqual([{ kind: "event", event: malformed }]);
+  });
+
+  it("stays honest-empty on an empty feed", () => {
+    expect(groupActivityRuns([])).toEqual([]);
   });
 });
 
