@@ -74,6 +74,15 @@ export function claudeProjectDirName(cwd: string): string {
 export const CLAUDE_CLI_SCHEME = "claude-cli:";
 
 /**
+ * The exact one-time install step that registers the `claude-cli:` handler (work-110). The
+ * handler is **CLI-only** — the Claude desktop app never registers it, regardless of how many
+ * interactive sessions it runs — so a desktop-only Owner needs this, not "just start a session,"
+ * to ever reach one-click launches. Per Anthropic's install doc: install the standalone CLI, then
+ * run it once (`claude`) to trigger the OS handler registration.
+ */
+export const CLI_INSTALL_COMMAND = "curl -fsSL https://claude.ai/install.sh | bash";
+
+/**
  * The deep link that opens a NEW Claude Code session in `cwd` with `prompt` prefilled
  * (ADR-016 / work-046, corrected in work-098). Emits the documented
  * `claude-cli://open?cwd=<abs>&q=<encoded>` form: `cwd` is the absolute working directory

@@ -2,6 +2,7 @@ import { WorkingIndicator } from "@scope-creep/design";
 import { useEffect, useRef, useState } from "react";
 import { Form } from "react-router";
 import { SubmitButton } from "~/components/state";
+import { CLI_INSTALL_COMMAND } from "~/lib/claude-sessions";
 
 /**
  * The Threads launcher UI (work-101/work-102, ADR-016). Two modes:
@@ -143,7 +144,8 @@ export function ResumePanel({
   // by what the Owner can actually do right now:
   //   correlated  → Resume the live session (the only true "Resume" — reserved wording, work-102)
   //   auto-launch → the seeded session is opening; a single manual "Open" is the fallback
-  //   copy        → the URL handler isn't registered yet; the copyable command is the one action
+  //   enable      → the URL handler isn't registered yet; show how to register it (the CLI-only
+  //                 install step, work-110) plus the copyable command as the immediate fallback
   //   config      → no resolved home, so no honest command exists — prompt for SCOPE_CREEP_HOME
   // (`correlated` is computed above, ahead of the auto-launch effect that also depends on it.)
 
@@ -181,11 +183,17 @@ export function ResumePanel({
         </div>
       ) : (
         <div className="launcher__body">
-          <p className="launcher__lead">
-            Claude Code's <code>claude-cli://</code> URL handler isn't registered on this machine
-            yet — it installs the first time you start an interactive Claude session. Until then,
-            run this to open the seeded session:
+          <p className="launcher__notice">
+            One-click launches need Claude Code's <code>claude-cli://</code> handler, which isn't
+            registered on this machine yet. The{" "}
+            <strong>Claude desktop app doesn't provide it</strong> — only the standalone CLI does.
+            Install it once to enable one-click:
           </p>
+          <CommandRow command={CLI_INSTALL_COMMAND} copyLabel="Copy install command" />
+          <p className="launcher__aside">
+            Then run <code>claude</code> once to register the handler, and reload this page.
+          </p>
+          <p className="launcher__lead">Until then, run this to open the seeded session:</p>
           {cliCommand ? <CommandRow command={cliCommand} copyLabel="Copy command" /> : null}
           <LinkingAside />
         </div>
