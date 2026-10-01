@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { db, ensureSchema } from "~/db";
 import { conversationMessages, conversations, feedback } from "~/db/schema";
+import { controlPlaneHome } from "./control-plane-home.server";
 import {
   type CommitRecord,
   type ConsistencyChecks,
@@ -91,10 +92,6 @@ export async function listHumanInput(): Promise<HumanInputEvent[]> {
 }
 
 const exec = promisify(execFile);
-
-function controlPlaneHome(): string {
-  return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
-}
 
 type OperatorRecord = {
   source?: string;

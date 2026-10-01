@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { controlPlaneHome } from "./control-plane-home.server";
 import {
   type CatalogModel,
   type ChatModelResolution,
@@ -22,10 +23,6 @@ import { getSetting } from "./settings.server";
 
 /** The DB settings key that holds the Owner's persisted chat-model pick. */
 export const CHAT_MODEL_SETTING = "chat_model";
-
-function controlPlaneHome(): string {
-  return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
-}
 
 type RawCatalog = {
   defaults?: Partial<ModelDefaults>;

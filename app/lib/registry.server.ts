@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { controlPlaneHome } from "./control-plane-home.server";
 
 /**
  * Reads the Scope Creep control plane's generated registries so the Console can
@@ -59,10 +60,6 @@ export type Registry = {
   apps: RegistryApp[];
   extensions: RegistryExtension[];
 };
-
-function controlPlaneHome(): string {
-  return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
-}
 
 async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T;

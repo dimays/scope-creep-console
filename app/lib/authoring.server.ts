@@ -7,6 +7,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { controlPlaneHome as controlPlaneRepoDir } from "./control-plane-home.server";
 import {
   addAssignee,
   type EmployeeSpec,
@@ -17,10 +18,7 @@ import type { Edit } from "./sandbox.server";
 import { renderTemplateManifest, type TemplateSpec, templateFilePath } from "./template-scaffold";
 import { listWork } from "./work.server";
 
-/** The control-plane repo (its git root) — same location the read-only surfaces use. */
-export function controlPlaneRepoDir(): string {
-  return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
-}
+export { controlPlaneRepoDir };
 
 /**
  * The edits to spin up an employee: the manifest, plus an `assignees` edit to each
