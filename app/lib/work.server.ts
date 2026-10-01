@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { marked } from "marked";
+import { controlPlaneHome as home } from "./control-plane-home.server";
 import { buildLinkIndex } from "./explore.server";
 import { linkifyWikilinks } from "./wikilinks";
 
@@ -9,10 +10,6 @@ import { linkifyWikilinks } from "./wikilinks";
  * can surface it as a board. Backend-first per ADR-005; read-only in v1. Sourced
  * live from SCOPE_CREEP_HOME (default ../scope-creep).
  */
-
-function home(): string {
-  return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
-}
 
 export type WorkStatus = "proposed" | "active" | "blocked" | "done";
 

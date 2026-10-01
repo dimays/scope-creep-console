@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { marked } from "marked";
 import { buildCliCommand, buildDeepLink, buildOpenRepoLink } from "./claude-sessions";
+import { controlPlaneHome as home } from "./control-plane-home.server";
 import { agentDisplayName, DISPLAY_NAMES } from "./display-name";
 import { type TicketRef, ticketsFor } from "./org.server";
 import { readRegistry } from "./registry.server";
@@ -14,10 +15,6 @@ import { listWork } from "./work.server";
  * Console can explain the platform to the Owner — read-only, sourced live from
  * SCOPE_CREEP_HOME (default ../scope-creep). See product/console-explore.prd.md.
  */
-
-function home(): string {
-  return process.env.SCOPE_CREEP_HOME ?? join(process.cwd(), "..", "scope-creep");
-}
 
 const DOC_DIRS: Array<{ dir: string; group: string }> = [
   { dir: "charter", group: "Charter" },
