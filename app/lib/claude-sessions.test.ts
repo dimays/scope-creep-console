@@ -91,6 +91,14 @@ describe("launch URLs + fallback command (work-046, scheme corrected work-098)",
     expect(cmd).toBe('cd /repo && claude "say \\"hello\\""');
   });
 
+  it("buildCliCommand escapes $ and backtick so they survive inert, not shell-active (work-108)", () => {
+    const cmd = buildCliCommand({ cwd: "/repo", prompt: "run $(whoami) and `id` for $HOME" });
+    expect(cmd).toBe('cd /repo && claude "run \\$(whoami) and \\`id\\` for \\$HOME"');
+    // Never let a raw, shell-active $ or backtick reach the paste target.
+    expect(cmd).not.toMatch(/(?<!\\)\$/);
+    expect(cmd).not.toMatch(/(?<!\\)`/);
+  });
+
   it("buildResumeCommand targets a specific session uuid", () => {
     expect(buildResumeCommand("abc-123")).toBe("claude --resume abc-123");
   });

@@ -103,11 +103,16 @@ export function buildOpenRepoLink(cwd: string): string {
 /**
  * The exact shell command to start the same seeded session by hand — the graceful fallback
  * for environments where the `claude:` scheme isn't registered (e.g. a deployed Linux Console
- * with the CLI available; work-046). Double quotes in the prompt are escaped so the command is
- * safe to paste.
+ * with the CLI available; work-046). Shell-active characters (`\`, `"`, `$`, backtick) are
+ * escaped so the command is safe to paste — `$`/backtick would otherwise be interpreted by the
+ * shell instead of passed literally (work-108).
  */
 export function buildCliCommand(opts: { cwd: string; prompt: string }): string {
-  const escaped = opts.prompt.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const escaped = opts.prompt
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\$/g, "\\$")
+    .replace(/`/g, "\\`");
   return `cd ${opts.cwd} && claude "${escaped}"`;
 }
 
