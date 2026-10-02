@@ -7,7 +7,6 @@ import { promisify } from "node:util";
 import {
   buildCliCommand,
   buildDeepLink,
-  buildOpenRepoLink,
   buildResumeCommand,
   buildSeedPrompt,
   claudeProjectDirName,
@@ -218,7 +217,6 @@ export type ThreadProjection = {
   homeResolved: boolean;
   deepLink: string | null;
   cliCommand: string | null;
-  openRepoLink: string | null;
   resumeCommand: string | null;
   schemeRegistered: boolean;
 };
@@ -256,7 +254,6 @@ export async function resolveThreadProjection(
     homeResolved,
     deepLink: cwd !== null ? buildDeepLink({ cwd, prompt: seedPrompt }) : null,
     cliCommand: cwd !== null ? buildCliCommand({ cwd, prompt: seedPrompt }) : null,
-    openRepoLink: cwd !== null ? buildOpenRepoLink(cwd) : null,
     schemeRegistered,
     newlyResolved: false,
   };

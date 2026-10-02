@@ -124,7 +124,6 @@ describe("resolveThreadProjection (orchestration)", () => {
     expect(p.cwd).toBeNull();
     expect(p.deepLink).toBeNull();
     expect(p.cliCommand).toBeNull();
-    expect(p.openRepoLink).toBeNull();
   });
 
   it("unresolved home still correlates a launched session (scan is home-independent)", async () => {
