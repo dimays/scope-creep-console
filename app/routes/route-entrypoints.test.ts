@@ -115,32 +115,36 @@ describe("route: /threads/:id branching (work-032)", () => {
     // deepLink would be the honest null (work-099) and the assertion below could not run.
     const prevHome = process.env.SCOPE_CREEP_HOME;
     process.env.SCOPE_CREEP_HOME = mkdtempSync(join(tmpdir(), "sc-route-home-"));
-    const id = await openThread("Launch flow", "Give me a State of the Product.");
-    const form = new FormData();
-    form.set("intent", "launch");
-    form.set("body", "Give me a State of the Product.");
-    const res = (await threadAction({
-      request: new Request(`http://localhost/threads/${id}`, { method: "POST", body: form }),
-      params: { id: String(id) },
-    } as never)) as Response;
-    expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe(`/threads/${id}`);
+    try {
+      const id = await openThread("Launch flow", "Give me a State of the Product.");
+      const form = new FormData();
+      form.set("intent", "launch");
+      form.set("body", "Give me a State of the Product.");
+      const res = (await threadAction({
+        request: new Request(`http://localhost/threads/${id}`, { method: "POST", body: form }),
+        params: { id: String(id) },
+      } as never)) as Response;
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe(`/threads/${id}`);
 
-    // The loader now reports a launched projection with launch affordances (no Claude call).
-    const data = await threadLoader({ params: { id: String(id) } } as never);
-    expect(data.thread.launchedAt).toBeTruthy();
-    expect(data.projection.status === "pending" || data.projection.status === "matched").toBe(true);
-    // Corrected launcher scheme (work-098): claude-cli://open?cwd=…&q=…, not the retired
-    // claude://code/new?…&folder=… form.
-    expect(data.projection.deepLink).toContain("claude-cli://open?cwd=");
-    expect(data.projection.deepLink).not.toContain("code/new");
-    expect(data.projection.homeResolved).toBe(true); // hermetic SCOPE_CREEP_HOME above
-    expect(data.projection.status).toBe("pending"); // empty projects dir → nothing correlated
-
-    if (prev === undefined) delete process.env.CLAUDE_PROJECTS_DIR;
-    else process.env.CLAUDE_PROJECTS_DIR = prev;
-    if (prevHome === undefined) delete process.env.SCOPE_CREEP_HOME;
-    else process.env.SCOPE_CREEP_HOME = prevHome;
+      // The loader now reports a launched projection with launch affordances (no Claude call).
+      const data = await threadLoader({ params: { id: String(id) } } as never);
+      expect(data.thread.launchedAt).toBeTruthy();
+      expect(data.projection.status === "pending" || data.projection.status === "matched").toBe(
+        true,
+      );
+      // Corrected launcher scheme (work-098): claude-cli://open?cwd=…&q=…, not the retired
+      // claude://code/new?…&folder=… form.
+      expect(data.projection.deepLink).toContain("claude-cli://open?cwd=");
+      expect(data.projection.deepLink).not.toContain("code/new");
+      expect(data.projection.homeResolved).toBe(true); // hermetic SCOPE_CREEP_HOME above
+      expect(data.projection.status).toBe("pending"); // empty projects dir → nothing correlated
+    } finally {
+      if (prev === undefined) delete process.env.CLAUDE_PROJECTS_DIR;
+      else process.env.CLAUDE_PROJECTS_DIR = prev;
+      if (prevHome === undefined) delete process.env.SCOPE_CREEP_HOME;
+      else process.env.SCOPE_CREEP_HOME = prevHome;
+    }
   });
 });
 
